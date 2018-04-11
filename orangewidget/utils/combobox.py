@@ -3,9 +3,9 @@ import warnings
 from typing import Optional
 
 from AnyQt.QtCore import (
-    Qt, QEvent, QObject, QAbstractItemModel, QSortFilterProxyModel,
-    QModelIndex, QSize, QRect, QPoint, QMargins, QElapsedTimer,
-    QTimer
+    Qt, QEvent, QObject, QMetaObject, QAbstractItemModel, QSortFilterProxyModel,
+    QModelIndex, QSize, QRect, QPoint, QMargins, QElapsedTimer, QTimer,
+    QItemSelectionModel,
 )
 from AnyQt.QtGui import QMouseEvent, QKeyEvent, QPainter, QPalette, QPen
 from AnyQt.QtWidgets import (
@@ -90,12 +90,6 @@ class ComboBox(QComboBox):
         super().mousePressEvent(event)
         self.__in_mousePressEvent = False
 
-    def showPopup(self):  # type: () -> None
-        # reimplemented
-        super().showPopup()
-        if self.__in_mousePressEvent:
-            self.__yamrit.start(QApplication.doubleClickInterval())
-
     def eventFilter(self, obj, event):
         # type: (QObject, QEvent) -> bool
         if event.type() == QEvent.MouseButtonRelease \
@@ -105,6 +99,139 @@ class ComboBox(QComboBox):
             return True
         else:
             return super().eventFilter(obj, event)
+
+    def showPopup(self):
+        """Reimplemented from `QComboBox.showPopup`."""
+        view = self.view()  # type: QAbstractItemView
+        view.ensurePolished()
+        model = self.model()  # type: QAbstractItemModel
+        root = self.rootModelIndex()
+        modelcol = self.modelColumn()
+        view.selectionModel().setCurrentIndex(
+            model.index(self.currentIndex(), modelcol, root),
+            QItemSelectionModel.ClearAndSelect
+        )
+        style = self.style()  # type: QStyle
+        opt = QStyleOptionComboBox()
+        self.initStyleOption(opt)
+        popup = style.styleHint(QStyle.SH_ComboBox_Popup, opt, self)
+        screen = QApplication.desktop().availableGeometry(self)
+        nrows = model.rowCount(root)
+        if nrows == 0:
+            return
+        # Estimate approximate list viewport size (bounded by maxVisibleItems
+        # and screen height)
+        count = 0
+        listrect = QRect()
+        for i in range(nrows):
+            index = model.index(i, modelcol, root)
+            if index.isValid():
+                r = view.visualRect(index)
+                listrect = listrect.united(r)
+                count += 1
+            if (not popup and count >= self.maxVisibleItems()) \
+                    or listrect.height() >= screen.height():
+                break
+
+        height = listrect.height()
+        margin_top = margin_bottom = 0
+        # get the container margins
+        container = view.parentWidget()  # type: QWidget
+        container.layout().activate()
+        assert container.windowFlags() & Qt.Window
+        for m in [container.contentsMargins(), view.contentsMargins()]:
+            margin_top += m.top()
+            margin_bottom += m.bottom()
+
+        if isinstance(view, QListView):
+            margin_top + view.spacing()
+            margin_bottom + view.spacing()
+
+        if popup:
+            margin_popup = style.pixelMetric(QStyle.PM_MenuVMargin, opt, self)
+            margin_top += margin_popup
+            margin_bottom += margin_popup
+
+        popup_rect = style.subControlRect(
+            QStyle.CC_ComboBox, opt, QStyle.SC_ComboBoxListBoxPopup,  self
+        )  # type: QRect
+        popup_size = (popup_rect.size()
+                      .expandedTo(QSize(0, height + margin_top + margin_bottom))
+                      .expandedTo(container.minimumSize())
+                      .boundedTo(container.maximumSize())
+                      .boundedTo(screen.size()))
+
+        popup_geom = QRect(
+            self.mapToGlobal(
+                popup_rect.topLeft() if popup else popup_rect.bottomLeft()),
+            popup_size
+        )
+
+        if popup:
+            # move vertically so the current item is above the popup_rect ...
+            current_rect = view.visualRect(view.currentIndex())
+            offset = current_rect.top() - (listrect.top() - margin_top)
+            popup_geom.moveTop(
+                max(popup_geom.top() - offset, screen.top())
+            )
+
+        # fix position if geom extends below the screen
+        if popup_geom.bottom() > screen.bottom():
+            if popup:
+                # can afford to just move it up
+                bottom_fixed = screen.bottom()
+            else:
+                # flip the rect about the popup_rect so it extends upwards
+                bottom_fixed = self.mapToGlobal(popup_rect.topLeft()).y()
+            popup_geom.moveBottom(bottom_fixed)
+
+        # assert popup_geom.top() >= screen.top()
+        popup_geom.setWidth(min(popup_geom.width(), screen.width()))
+
+        if popup_geom.left() < screen.left():
+            popup_geom.moveLeft(screen.left())
+        if popup_geom.right() > screen.right():
+            popup_geom.moveRight(screen.right())
+
+        if popup:
+            scrollhint = QListView.PositionAtCenter
+        else:
+            scrollhint = QListView.EnsureVisible
+        view.scrollTo(view.currentIndex(), scrollhint)
+
+        # Need to hide the popup scrollers so the view is resized to the
+        # full extent. Unfortunately the necessary interface is not public
+        # (QComboBoxPrivateContainer), but is accessible via the Qt's meta
+        # object system
+        def invoke(method):
+            mo = container.metaObject()  # type: QMetaObject
+            mindex = mo.indexOfMethod(method)
+            if mindex != -1:
+                mm = mo.method(mindex)
+                mm.invoke(container, Qt.DirectConnection)
+
+        invoke('hideScrollers()')
+        container.setGeometry(popup_geom)
+        container.raise_()
+        container.show()
+        invoke('updateScrollers()')
+
+        handle = container.windowHandle()
+        if handle is not None:
+            window = self.window().windowHandle()
+            if window is not None and window.screen() is not None \
+                    and handle.screen() is not window.screen():
+                handle.setScreen(window.screen())
+        # Missing in PyQt5 < 5.11
+        try:
+            QApplication.inputMethod().reset()
+        except AttributeError:
+            pass
+
+        view.setFocus(Qt.PopupFocusReason)
+
+        if self.__in_mousePressEvent:
+            self.__yamrit.start(QApplication.doubleClickInterval())
 
 
 class _ComboBoxListDelegate(QStyledItemDelegate):
