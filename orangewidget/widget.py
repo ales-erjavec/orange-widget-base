@@ -249,8 +249,7 @@ class OWBaseWidget(QDialog, OWComponent, Report, ProgressBarMixin,
         # this action is enabled by the canvas framework
         self.__help_action = QAction(
             "Help", self, objectName="action-help", toolTip="Show help",
-            enabled=False, visible=False,
-            shortcut=QKeySequence(Qt.Key_F1)
+            enabled=False, shortcut=QKeySequence(Qt.Key_F1)
         )
         self.__report_action = QAction(
             "Report", self, objectName="action-report",
