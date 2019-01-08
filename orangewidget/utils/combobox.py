@@ -1,3 +1,5 @@
+import warnings
+
 from typing import Optional
 
 from AnyQt.QtCore import (
@@ -226,10 +228,8 @@ class ComboBoxSearch(QComboBox):
                       .expandedTo(window.minimumSize())
                       .boundedTo(window.maximumSize())
                       .boundedTo(screenrect.size()))
-        popuprect = QRect(popuprect_origin.bottomLeft(), popup_size)
-
         popuprect = dropdown_popup_geometry(
-            popuprect, popuprect_origin, screenrect)
+            popup_size, popuprect_origin, screenrect)
         popup.setGeometry(popuprect)
 
         current = proxy.mapFromSource(
@@ -408,34 +408,48 @@ def qwidget_margin_within(widget, ancestor):
                     r2.bottom() - bottomright.y())
 
 
-def dropdown_popup_geometry(geometry, origin, screen):
-    # type: (QRect, QRect, QRect) -> QRect
+def dropdown_popup_geometry(size, origin, screen, preferred_direction="down"):
+    # type: (QRect, QRect, QRect, str) -> QRect
     """
     Move/constrain the geometry for a drop down popup.
 
     Parameters
     ----------
-    geometry : QRect
-        The base popup geometry if not constrained.
+    size : QRect
+        The base popup size if not constrained.
     origin : QRect
-        The origin rect from which the popup extends.
+        The origin rect from which the popup extends (in screen coords.).
     screen : QRect
         The available screen geometry into which the popup must fit.
+    preferred_direction : str
+        'up' or 'down'
 
     Returns
     -------
     geometry: QRect
-        Constrained drop down list geometry to fit into  screen
+        Constrained drop down list geometry to fit into screen
     """
-    # if the popup  geometry extends bellow the screen and there is more room
-    # above the popup origin ...
-    geometry = QRect(geometry)
-    geometry.moveTopLeft(origin.bottomLeft() + QPoint(0, 1))
+    if isinstance(size, QRect):
+        warnings.warn(
+            "Deprecated, pass QSize ",
+            DeprecationWarning, stacklevel=2
+        )
+        size = size.size()
 
-    if geometry.bottom() > screen.bottom() \
-            and origin.center().y() > screen.center().y():
-        # ...flip the rect about the origin so it extends upwards
-        geometry.moveBottom(origin.top() - 1)
+    if preferred_direction == "down":
+        # if the popup  geometry extends bellow the screen and there is more
+        # room above the popup origin ...
+        geometry = QRect(origin.bottomLeft() + QPoint(0, 1), size)
+        if geometry.bottom() > screen.bottom() \
+                and origin.center().y() > screen.center().y():
+            # ...flip the rect about the origin so it extends upwards
+            geometry.moveBottom(origin.top() - 1)
+    elif preferred_direction == "up":
+        geometry = QRect(origin.topLeft() - QPoint(0, 1 + size.height()), size)
+        if geometry.top() < screen.top() \
+                and origin.center().y() < screen.center().y():
+            # ... flip, extend down
+            geometry.moveTop(origin.bottom() - 1)
 
     # fixup horizontal position if it extends outside the screen
     if geometry.left() < screen.left():
