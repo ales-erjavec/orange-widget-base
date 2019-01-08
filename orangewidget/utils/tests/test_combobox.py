@@ -122,21 +122,21 @@ class TestComboBoxSearch(GuiTest):
             combobox.ComboBoxSearch(enabled=False)
 
     def test_popup_util(self):
-        geom = QRect(10, 10, 100, 400)
+        size = QRect(10, 10, 100, 400)
         screen = QRect(0, 0, 600, 600)
         g1 = combobox.dropdown_popup_geometry(
-            geom, QRect(200, 100, 100, 20), screen
+            size, QRect(200, 100, 100, 20), screen
         )
         self.assertEqual(g1, QRect(200, 120, 100, 400))
         g2 = combobox.dropdown_popup_geometry(
-            geom, QRect(-10, 0, 100, 20), screen
+            size, QRect(-10, 0, 100, 20), screen
         )
         self.assertEqual(g2, QRect(0, 20, 100, 400))
         g3 = combobox.dropdown_popup_geometry(
-            geom, QRect(590, 0, 100, 20), screen
+            size, QRect(590, 0, 100, 20), screen
         )
         self.assertEqual(g3, QRect(600 - 100, 20, 100, 400))
         g4 = combobox.dropdown_popup_geometry(
-            geom, QRect(0, 500, 100, 20), screen
+            size, QRect(0, 500, 100, 20), screen
         )
         self.assertEqual(g4, QRect(0, 500 - 400, 100, 400))

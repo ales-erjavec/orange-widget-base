@@ -1148,9 +1148,10 @@ class OWBaseWidget(QDialog, OWComponent, Report, ProgressBarMixin,
             b.mapToGlobal(QPoint(0, 0)), b.size()
         )
         menu.ensurePolished()
-        menu_rect = QRect(QPoint(0, 0), menu.sizeHint())
         screen_rect = QApplication.desktop().availableGeometry(b)
-        menu_rect = dropdown_popup_geometry(menu_rect, popup_rect, screen_rect)
+        menu_rect = dropdown_popup_geometry(
+            menu.sizeHint(), popup_rect, screen_rect, preferred_direction="up"
+        )
         menu.popup(menu_rect.topLeft())
 
     def setCaption(self, caption):
