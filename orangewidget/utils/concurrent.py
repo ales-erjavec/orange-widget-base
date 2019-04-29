@@ -3,22 +3,20 @@ General helper functions and classes for PyQt concurrent programming
 """
 # TODO: Rename the module to something that does not conflict with stdlib
 # concurrent
-from typing import Callable, Any
+from typing import Callable, Any, List, Optional, Union, Type
+
 import threading
 import logging
 import warnings
-import weakref
-from functools import partial
+from functools import partial, lru_cache
 import concurrent.futures
 from concurrent.futures import Future, TimeoutError
 
 from AnyQt.QtCore import (
-    Qt, QObject, QMetaObject, QThreadPool, QThread, QRunnable, QSemaphore,
-    QCoreApplication, QEvent, Q_ARG,
+    Qt, QObject, QThreadPool, QThread, QRunnable, QSemaphore,
+    QCoreApplication, QEvent,
     pyqtSignal as Signal, pyqtSlot as Slot
 )
-
-_log = logging.getLogger(__name__)
 
 
 class FutureRunnable(QRunnable):
@@ -122,9 +120,6 @@ class FutureWatcher(QObject):
     #: exception.
     exceptionReady = Signal(BaseException)
 
-    # A private event type used to notify the watcher of a Future's completion
-    __FutureDone = QEvent.registerEventType()
-
     def __init__(self, future=None, parent=None, **kwargs):
         super().__init__(parent, **kwargs)
         self.__future = None
@@ -146,24 +141,10 @@ class FutureWatcher(QObject):
             raise RuntimeError("Future already set")
 
         self.__future = future
-        selfweakref = weakref.ref(self)
-
-        def on_done(f):
-            assert f is future
-            selfref = selfweakref()
-
-            if selfref is None:
-                return
-
-            try:
-                QCoreApplication.postEvent(
-                    selfref, QEvent(FutureWatcher.__FutureDone))
-            except RuntimeError:
-                # Ignore RuntimeErrors (when C++ side of QObject is deleted)
-                # (? Use QObject.destroyed and remove the done callback ?)
-                pass
-
-        future.add_done_callback(on_done)
+        callback = methodinvoke.from_method(
+            self.__future_done, (Future,), conntype=Qt.QueuedConnection
+        )
+        future.add_done_callback(callback)
 
     def future(self):
         # type: () -> Future
@@ -228,11 +209,10 @@ class FutureWatcher(QObject):
         else:
             assert False
 
-    def customEvent(self, event):
-        # Reimplemented.
-        if event.type() == FutureWatcher.__FutureDone:
-            self.__emitSignals()
-        super().customEvent(event)
+    @Slot(Future)
+    def __future_done(self, f):
+        assert f is self.__future
+        self.__emitSignals()
 
 
 class FutureSetWatcher(QObject):
@@ -297,7 +277,7 @@ class FutureSetWatcher(QObject):
     doneAll = Signal()
 
     def __init__(self, futures=None, *args, **kwargs):
-        # type: (List[Future], ...) -> None
+        # type: (List[Future], Any, Any) -> None
         super().__init__(*args, **kwargs)
         self.__futures = None
         self.__semaphore = None
@@ -319,30 +299,19 @@ class FutureSetWatcher(QObject):
         if self.__futures is not None:
             raise RuntimeError("already set")
         self.__futures = []
-        selfweakref = weakref.ref(self)
         schedule_emit = methodinvoke(self, "__emitpending", (int, Future))
-
         # Semaphore counting the number of future that have enqueued
         # done notifications. Used for the `wait` implementation.
         self.__semaphore = semaphore = QSemaphore(0)
 
+        def on_done(index, f):
+            try:
+                schedule_emit(index, f)
+            finally:
+                semaphore.release()
+
         for i, future in enumerate(futures):
             self.__futures.append(future)
-
-            def on_done(index, f):
-                try:
-                    selfref = selfweakref()  # not safe really
-                    if selfref is None:  # pragma: no cover
-                        return
-                    try:
-                        schedule_emit(index, f)
-                    except RuntimeError:  # pragma: no cover
-                        # Ignore RuntimeErrors (when C++ side of QObject is deleted)
-                        # (? Use QObject.destroyed and remove the done callback ?)
-                        pass
-                finally:
-                    semaphore.release()
-
             future.add_done_callback(partial(on_done, i))
 
         if not self.__futures:
@@ -442,6 +411,7 @@ class methodinvoke(object):
     >>> app.exec()
     0
     """
+
     @staticmethod
     def from_method(method, arg_types=(), *, conntype=Qt.QueuedConnection):
         """
@@ -464,7 +434,17 @@ class methodinvoke(object):
         """
         obj = method.__self__
         name = method.__name__
-        return methodinvoke(obj, name, arg_types, conntype=conntype)
+        t = emitter_class(arg_types)()
+        t.sig.connect(method, conntype)
+        mi = methodinvoke.__new__(methodinvoke)
+        mi.obj = obj
+        mi.method = method
+        mi.arg_types = arg_types
+        mi.conntype = conntype
+        mi.__emitter = t
+        return mi
+        # return t.sig.emit
+        # return methodinvoke(obj, name, arg_types, conntype=conntype)
 
     def __init__(self, obj, method, arg_types=(), *,
                  conntype=Qt.QueuedConnection):
@@ -472,8 +452,35 @@ class methodinvoke(object):
         self.method = method
         self.arg_types = tuple(arg_types)
         self.conntype = conntype
+        emitter_type = emitter_class(*self.arg_types)
+        self.__emitter = emitter_type()
+        # This used to work using `QMetaObject.invokeMethod` which references
+        # to slots by name. 'Private' private methods (`def __blabla(...)` are
+        # registered unmangled with Qt object system, so we (try to) do the
+        # mangaling here.
+        methodname = self.__mangled_method_name(type(obj), method)
+        self.__emitter.sig.connect(
+            getattr(self.obj, methodname), self.conntype
+        )
+
+    @staticmethod
+    def __mangled_method_name(klass: type, name: str):
+        if hasattr(klass, name):
+            return name
+        if not name.startswith("__"):
+            return name
+        for klass_ in klass.mro():
+            mangle = f'_{klass_.__name__}{name}'
+            if mangle in klass_.__dict__:
+                return mangle
+        return name
 
     def __call__(self, *args):
-        args = [Q_ARG(atype, arg) for atype, arg in zip(self.arg_types, args)]
-        return QMetaObject.invokeMethod(
-            self.obj, self.method, self.conntype, *args)
+        self.__emitter.sig.emit(*args)
+
+
+@lru_cache(maxsize=1024)
+def emitter_class(*argtypes: Union[type, str]) -> Type[QObject]:
+    class Emitter(QObject):
+        sig = Signal(*argtypes)
+    return Emitter

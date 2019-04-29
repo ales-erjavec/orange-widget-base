@@ -7,7 +7,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from types import SimpleNamespace
 from typing import Iterable, Set
 
-from AnyQt.QtCore import QObject, QCoreApplication, QThread, pyqtSlot
+from AnyQt.QtCore import QObject, QCoreApplication, QThread, pyqtSlot, Qt
 from AnyQt.QtTest import QSignalSpy
 
 from orangewidget.utils.concurrent import (
@@ -53,6 +53,18 @@ class TestMethodinvoke(CoreAppTestCase):
                          "set_state was invoked in the main thread")
 
         executor.shutdown(wait=True)
+
+    def tests_methodinvoke_mangled(self):
+        class Obj(QObject):
+            a = False
+            @pyqtSlot()
+            def __mangled(self):
+                self.a = True
+
+        o = Obj()
+        mi = methodinvoke(o, "__mangled", (), conntype=Qt.DirectConnection)
+        mi()
+        self.assertTrue(o.a)
 
 
 class TestFutureWatcher(CoreAppTestCase):
