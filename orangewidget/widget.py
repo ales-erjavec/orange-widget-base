@@ -19,7 +19,7 @@ from AnyQt.QtCore import (
     QSettings, QUrl, QThread, QTimer, QSize, QPoint, pyqtSignal as Signal,
 )
 from AnyQt.QtGui import (
-    QIcon, QKeySequence, QDesktopServices, QPainter, QKeyEvent
+    QIcon, QKeySequence, QDesktopServices, QPainter, QKeyEvent, QActionEvent
 )
 
 from orangewidget import settings, gui
@@ -1497,6 +1497,19 @@ class OWBaseWidget(QDialog, OWComponent, Report, ProgressBarMixin,
             version of the saved context
             or None if context was created before migrations
         """
+
+    def actionEvent(self, event: QActionEvent) -> None:
+        if event.type() == QEvent.ActionAdded or QEvent.ActionRemoved:
+            event = cast(QActionEvent, event)
+            action = event.action()
+            if action.objectName().startswith("action-canvas-"):
+                menu = self.findChild(QMenu, "menu-window")
+                if menu is not None:
+                    if event.type() == QEvent.ActionAdded:
+                        menu.addAction(action)
+                    else:
+                        menu.removeAction(action)
+        super().actionEvent(event)
 
 
 class _StatusBar(QStatusBar):
