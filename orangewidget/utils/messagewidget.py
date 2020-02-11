@@ -103,7 +103,7 @@ class Message(
         return super().__new__(cls, Severity(severity), QIcon(icon), text,
                                informativeText, detailedText, textFormat)
 
-    def asHtml(self):
+    def asHtml(self, includeShortText=True):
         # type: () -> str
         """
         Render the message as an HTML fragment.
@@ -126,14 +126,16 @@ class Message(
         imgsize = 12
         parts = [
             ('<div class="message {}">'
-             .format(self.severity.name.lower())),
-            ('<div class="field-text">'
-             '<img src="{iconurl}" width="{imgsize}" height="{imgsize}" />'
-             '{text}'
-             '</div>'
-             .format(iconurl=iconsrc(self, size=imgsize * 2), imgsize=imgsize,
-                     text=render(self.text)))
+             .format(self.severity.name.lower()))
         ]
+        if includeShortText:
+            parts += [('<div class="field-text">'
+                       '<img src="{iconurl}" width="{imgsize}" height="{imgsize}" />'
+                       ' {text}'
+                       '</div>'
+                       .format(iconurl=iconsrc(self, size=imgsize * 2),
+                               imgsize=imgsize,
+                               text=render(self.text)))]
         if self.informativeText:
             parts += ['<div class="field-informative-text">{}</div>'
                       .format(render(self.informativeText))]
@@ -568,19 +570,22 @@ class MessagesWidget(QWidget):
         self.__textlabel.setTextFormat(summary.textFormat)
         self.__textlabel.setText(summary.text)
         self.__textlabel.setVisible(bool(summary.text))
+
+        def is_short(m):
+            return not (m.informativeText or m.detailedText)
+
         messages = [m for m in self.__messages.values() if not m.isEmpty()]
-        if messages:
+        if not messages:
+            fulltext = ""
+        elif len(messages) > 1 or len(messages) == 1 and is_short(messages[0]):
             messages = sorted(messages, key=attrgetter("severity"),
                               reverse=True)
             fulltext = "<hr/>".join(m.asHtml() for m in messages)
         else:
-            fulltext = ""
+            fulltext = messages[0].asHtml(includeShortText=False)
         self.__fulltext = fulltext
         self.setToolTip(self.__styled(self.__defaultStyleSheet, fulltext))
         self.anim.start(QPropertyAnimation.KeepWhenStopped)
-
-        def is_short(m):
-            return not (m.informativeText or m.detailedText)
 
         if not messages or len(messages) == 1 and is_short(messages[0]):
             self.__popuptext = ""
