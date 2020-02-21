@@ -296,7 +296,7 @@ class OWBaseWidget(QDialog, OWComponent, Report, ProgressBarMixin,
 
         if self.controlArea is not None:
             # Otherwise, the first control has focus
-            self.controlArea.setFocus(Qt.ActiveWindowFocusReason)
+            self.controlArea.setFocus(Qt.OtherFocusReason)
 
         if self.__splitter is not None:
             self.__splitter.handleClicked.connect(self.__toggleControlArea)
