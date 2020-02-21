@@ -70,8 +70,8 @@ class SimpleButton(QAbstractButton):
     A simple icon button widget.
     """
     def __init__(self, parent=None, **kwargs):
-        super().__init__(parent, **kwargs)
         self.__focusframe = None
+        super().__init__(parent, **kwargs)
 
     def focusInEvent(self, event):
         # reimplemented
