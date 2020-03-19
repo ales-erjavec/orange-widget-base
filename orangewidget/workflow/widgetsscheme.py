@@ -23,6 +23,7 @@ import logging
 import enum
 import types
 import warnings
+from itertools import count
 
 from urllib.parse import urlencode
 from weakref import finalize
@@ -700,12 +701,36 @@ def user_message_from_state(message_group):
         data={"content-type": "text/html"})
 
 
+NODE_WORKFLOW_ID_NAME = "_WidgetsSignalManager__node_id"
+node_id_counter = count()
+
+
 class WidgetsSignalManager(SignalManager):
     """
     A signal manager for a WidgetsScheme.
     """
     def __init__(self, scheme, **kwargs):
         super().__init__(scheme, **kwargs)
+
+    def set_workflow(self, workflow):  # type: (Scheme) -> None
+        old = self.workflow()
+        if old is not None:
+            old.node_added.disconnect(self._ensure_node_id)
+        for node in workflow.nodes:
+            self._ensure_node_id(node)
+        super().set_workflow(workflow)
+        if workflow is not None:
+            workflow.node_added.connect(self._ensure_node_id)
+
+    def node_id(self, node: SchemeNode) -> int:
+        self._ensure_node_id(node)
+        return node.property(NODE_WORKFLOW_ID_NAME)
+
+    def _ensure_node_id(self, node: SchemeNode) -> None:
+        nid = node.property(NODE_WORKFLOW_ID_NAME)
+        if not isinstance(nid, int):
+            nid = next(node_id_counter)
+            node.setProperty(NODE_WORKFLOW_ID_NAME, nid)
 
     def send(self, widget, channelname, value, signal_id):
         # type: (OWBaseWidget, str, Any, Any) -> None
@@ -731,8 +756,7 @@ class WidgetsSignalManager(SignalManager):
         # Expand the signal_id with the unique widget id and the
         # channel name. This is needed for OWBaseWidget's input
         # handlers with Multiple flag.
-        signal_id = (widget.widget_id, channelname, signal_id)
-
+        signal_id = (self.node_id(node), channelname, signal_id)
         super().send(node, channel, value, signal_id)
 
     @overload
@@ -809,9 +833,6 @@ class WidgetsSignalManager(SignalManager):
                 link = signal.link
                 value = signal.value
                 handler = link.sink_channel.handler
-                if handler.startswith("self."):
-                    handler = handler.split(".", 1)[1]
-
                 handler = getattr(widget, handler)
 
                 if link.sink_channel.single:
