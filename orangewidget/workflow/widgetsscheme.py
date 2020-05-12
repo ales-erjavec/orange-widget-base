@@ -28,7 +28,7 @@ from itertools import count
 from urllib.parse import urlencode
 from weakref import finalize
 
-from typing import Optional, Dict, Any, List, overload
+from typing import Optional, Dict, Any, List, overload, Sequence
 
 from AnyQt.QtWidgets import QWidget, QAction
 from AnyQt.QtGui import QWhatsThisClickedEvent
@@ -46,8 +46,9 @@ from orangecanvas.scheme.node import UserMessage
 from orangecanvas.scheme.widgetmanager import WidgetManager as _WidgetManager
 from orangecanvas.utils import name_lookup
 from orangecanvas.resources import icon_loader
+from orangewidget.utils.signals import Input
 
-from orangewidget.widget import OWBaseWidget
+from orangewidget.widget import OWBaseWidget, Closed
 from orangewidget.report.owreport import OWReport
 from orangewidget.settings import SettingsPrinter
 
@@ -826,6 +827,8 @@ class WidgetsSignalManager(SignalManager):
         """
         Process new signals for the OWBaseWidget.
         """
+        workflow = self.workflow()
+        assert workflow is not None
         app = QCoreApplication.instance()
         try:
             app.setOverrideCursor(Qt.WaitCursor)
@@ -838,6 +841,8 @@ class WidgetsSignalManager(SignalManager):
                 if link.sink_channel.single:
                     args = (value,)
                 else:
+                    if value is None and link not in workflow.links:
+                        value = _close_sentinel_for_input(widget, link.sink_channel.name)
                     args = (value, signal.id)
 
                 log.debug("Process signals: calling %s.%s (from %s with id:%s)",
@@ -858,3 +863,13 @@ class WidgetsSignalManager(SignalManager):
                 raise
         finally:
             app.restoreOverrideCursor()
+
+
+def _close_sentinel_for_input(widget: OWBaseWidget, name: str):
+    inputs: Sequence[Input] = widget.get_signals("input", ignore_old_style=True)
+    if widget.supports_explicit_close_event:
+        return Closed
+    for input in inputs:
+        if input.name == name:
+            return getattr(input, "closing_sentinel", None)
+    return None
