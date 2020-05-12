@@ -444,7 +444,7 @@ class WidgetTest(GuiTest):
         handler = getattr(widget, input.handler)
 
         # Assert sent input is of correct class
-        assert isinstance(value, (input.type, type(None))), \
+        assert isinstance(value, (input.type, type(None), type(input.closing_sentinel))), \
             '{} should be {}'.format(value.__class__.__mro__, input.type)
 
         handler(value, *args)

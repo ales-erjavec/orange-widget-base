@@ -14,6 +14,15 @@ from orangewidget.utils import getmembers
 _counter = itertools.count()
 
 
+Closed = type(
+    "Closed", (object,), {
+        "__doc__": "Explicit connection closing sentinel.",
+        "__repr__": lambda self: "Closed",
+        "__str__": lambda self: "Closed",
+    }
+)()
+
+
 class _Signal:
     @staticmethod
     def get_flags(multiple, default, explicit, dynamic):
@@ -77,11 +86,15 @@ class Input(InputSignal, _Signal):
         if set, this signal is only used when it is the only option or when
         explicitly connected in the dialog (default: `False`)
     """
+    Closed = Closed
+
     def __init__(self, name, type, id=None, doc=None, replaces=None, *,
-                 multiple=False, default=False, explicit=False):
+                 multiple=False, default=False, explicit=False,
+                 closing_sentinel=None):
         flags = self.get_flags(multiple, default, explicit, False)
         super().__init__(name, type, "", flags, id, doc, replaces or [])
         self._seq_id = next(_counter)
+        self.closing_sentinel = closing_sentinel
 
     def __call__(self, method):
         """
