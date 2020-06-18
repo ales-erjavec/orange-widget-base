@@ -23,6 +23,7 @@ import logging
 import enum
 import types
 import warnings
+from functools import singledispatch
 
 from urllib.parse import urlencode
 from weakref import finalize
@@ -807,38 +808,7 @@ class WidgetsSignalManager(SignalManager):
         app = QCoreApplication.instance()
         try:
             app.setOverrideCursor(Qt.WaitCursor)
-            for signal in signals:
-                link = signal.link
-                value = signal.value
-                handler = link.sink_channel.handler
-                if handler.startswith("self."):
-                    handler = handler.split(".", 1)[1]
-
-                handler = getattr(widget, handler)
-
-                if link.sink_channel.single:
-                    args = (value,)
-                else:
-                    if value is None and link not in workflow.links:
-                        value = _close_sentinel_for_input(widget, link.sink_channel.name)
-                    args = (value, signal.id)
-
-                log.debug("Process signals: calling %s.%s (from %s with id:%s)",
-                          type(widget).__name__, handler.__name__, link, signal.id)
-
-                try:
-                    handler(*args)
-                except Exception:
-                    log.exception("Error calling '%s' of '%s'",
-                                  handler.__name__, node.title)
-                    raise
-
-            try:
-                widget.handleNewSignals()
-            except Exception:
-                log.exception("Error calling 'handleNewSignals()' of '%s'",
-                              node.title)
-                raise
+            process_signals_for_widget(widget, signals, workflow)
         finally:
             app.restoreOverrideCursor()
 
@@ -849,3 +819,41 @@ def _close_sentinel_for_input(widget: OWBaseWidget, name: str):
         if input.name == name:
             return getattr(input, "closing_sentinel", None)
     return None
+
+
+@singledispatch
+def process_signals_for_widget(widget, signals, workflow):
+    # type: (OWBaseWidget, List[Signal], Scheme) -> None
+    """
+    Process new signals for the OWBaseWidget.
+    """
+    for signal in signals:
+        link = signal.link
+        node = link.sink_node
+        value = signal.value
+        handler = link.sink_channel.handler
+        handler = getattr(widget, handler)
+        if link.sink_channel.single:
+            args = (value,)
+        else:
+            if value is None and link not in workflow.links:
+                value = _close_sentinel_for_input(widget, link.sink_channel.name)
+            args = (value, signal.id)
+
+        log.debug("Process signals: calling %s.%s (from %s with id:%s)",
+                  type(widget).__name__, handler.__name__, link, signal.id)
+
+        try:
+            handler(*args)
+        except Exception:
+            log.exception("Error calling '%s' of '%s'",
+                          handler.__name__, node.title)
+            raise
+
+    try:
+        widget.handleNewSignals()
+    except Exception:
+        log.exception("Error calling 'handleNewSignals()' of '%s'",
+                      node.title)
+        raise
+
