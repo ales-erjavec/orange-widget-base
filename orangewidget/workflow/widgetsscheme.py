@@ -28,7 +28,7 @@ from functools import singledispatch
 from urllib.parse import urlencode
 from weakref import finalize
 
-from typing import Optional, Dict, Any, List, overload, Sequence
+from typing import Optional, Dict, Any, List, overload, Iterable
 
 from AnyQt.QtWidgets import QWidget, QAction
 from AnyQt.QtGui import QWhatsThisClickedEvent
@@ -36,7 +36,7 @@ from AnyQt.QtGui import QWhatsThisClickedEvent
 from AnyQt.QtCore import Qt, QCoreApplication, QEvent, QByteArray
 from AnyQt.QtCore import pyqtSlot as Slot
 
-from orangecanvas.registry import WidgetDescription, OutputSignal
+from orangecanvas.registry import WidgetDescription, OutputSignal, InputSignal
 
 from orangecanvas.scheme.signalmanager import (
     SignalManager, Signal, compress_signals
@@ -813,11 +813,25 @@ class WidgetsSignalManager(SignalManager):
             app.restoreOverrideCursor()
 
 
-def _close_sentinel_for_input(widget: OWBaseWidget, name: str):
-    inputs: Sequence[Input] = widget.get_signals("inputs", ignore_old_style=True)
-    for input in inputs:
-        if input.name == name:
-            return getattr(input, "closing_sentinel", None)
+def get_input_meta(widget: OWBaseWidget, name: str) -> Optional[Input]:
+    def as_input(obj):
+        if isinstance(obj, Input):
+            return obj
+        elif isinstance(obj, InputSignal):
+            rval = Input(obj.name, obj.type, obj.id, obj.doc, obj.replaces,
+                         multiple=not obj.single, default=obj.default,
+                         explicit=obj.explicit)
+            rval.handler = obj.handler
+            return rval
+        elif isinstance(obj, tuple):
+            return as_input(InputSignal(*obj))
+        else:
+            raise TypeError
+
+    inputs: Iterable[Input] = map(as_input, widget.get_signals("inputs"))
+    for input_ in inputs:
+        if input_.name == name:
+            return input_
     return None
 
 
@@ -829,31 +843,31 @@ def process_signals_for_widget(widget, signals, workflow):
     """
     for signal in signals:
         link = signal.link
-        node = link.sink_node
+        input_meta = get_input_meta(widget, link.sink_channel.name)
+        assert input_meta is not None
         value = signal.value
-        handler = link.sink_channel.handler
+        handler = input_meta.handler
         handler = getattr(widget, handler)
-        if link.sink_channel.single:
+
+        if link not in workflow.links:
+            value = input_meta.closing_sentinel
+
+        if input_meta.single:
             args = (value,)
         else:
-            if value is None and link not in workflow.links:
-                value = _close_sentinel_for_input(widget, link.sink_channel.name)
             args = (value, signal.id)
-
         log.debug("Process signals: calling %s.%s (from %s with id:%s)",
                   type(widget).__name__, handler.__name__, link, signal.id)
-
         try:
             handler(*args)
         except Exception:
             log.exception("Error calling '%s' of '%s'",
-                          handler.__name__, node.title)
+                          handler.__name__, widget.captionTitle)
             raise
-
     try:
         widget.handleNewSignals()
     except Exception:
         log.exception("Error calling 'handleNewSignals()' of '%s'",
-                      node.title)
+                      widget.captionTitle)
         raise
 
