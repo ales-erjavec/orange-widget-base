@@ -113,6 +113,18 @@ class Show(widget.OWBaseWidget):
         print(self.x)
 
 
+class OldStyleShow(widget.OWBaseWidget):
+    name = "Show"
+    inputs = [("X", object, "set_x")]
+    x = None
+
+    def set_x(self, x):
+        self.x = x
+
+    def handleNewSignals(self):
+        print(self.x)
+
+
 def widget_description(class_):
     # type: (Type[widget.OWBaseWidget]) -> WidgetDescription
     return WidgetDescription(**class_.get_widget_description())
@@ -402,3 +414,13 @@ class TestSignalManager(GuiTest):
         model.insert_link(0, link)
         w1.Outputs.out.send(None)
         check_inputs([None, -42])
+
+    def test_old_style_input(self):
+        model, widgets = create_workflow()
+        show_node = model.new_node(widget_description(OldStyleShow))
+        show = model.widget_for_node(show_node)
+        model.new_link(widgets.w1_node, "X", show_node, "X")
+        widgets.w1.Outputs.out.send(1)
+        spy = QSignalSpy(show_node.state_changed)
+        spy.wait()
+        self.assertEqual(show.x, 1)
