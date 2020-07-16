@@ -239,9 +239,17 @@ class OWReport(OWBaseWidget):
         self.save_button.setEnabled(self.table_model.rowCount())
         self.print_button.setEnabled(self.table_model.rowCount())
 
-    def _build_html(self):
+    def _build_html(self, selected_id=None):
         html = self.report_html_template
-        html += "<body>"
+        if selected_id is not None:
+            onload = f"(function (id) {{" \
+                     f"     setSelectedId(id); scrollToId(id); " \
+                     f"}}" \
+                     f"(\"{selected_id}\"));" \
+                     f""
+            html += f"<body onload='{onload}'>"
+        else:
+            html += "<body>"
         for i in range(self.table_model.rowCount()):
             item = self.table_model.item(i)
             html += "<div id='{}' class='normal' " \
@@ -256,25 +264,28 @@ class OWReport(OWBaseWidget):
         self.report_view.setHtml(html)
 
     def _scroll_to_item(self, item):
-        self.report_view.evalJS(
-            "document.getElementById('{}').scrollIntoView();".format(item.id)
+        self.report_view.runJavaScript(
+            f"scrollToId('{item.id}')",
+            lambda res: log.debug("scrollToId returned %s", res)
         )
 
     def _change_selected_item(self, item):
-        self.report_view.evalJS(
-            "var sel_el = document.getElementsByClassName('selected')[0]; "
-            "if (sel_el.id != {}) "
-            "   sel_el.className = 'normal';".format(item.id))
-        self.report_view.evalJS(
-            "document.getElementById('{}').className = 'selected';"
-            .format(item.id))
+        self.report_view.runJavaScript(
+            f"setSelectedId('{item.id}');",
+            lambda res: log.debug("setSelectedId returned %s", res)
+        )
         self.report_changed = True
 
     def make_report(self, widget):
         item = self._add_item(widget)
-        self._build_html()
-        self._scroll_to_item(item)
+        self._build_html(item.id)
+        self.table.selectionModel().selectionChanged.disconnect(
+            self._table_selection_changed
+        )
         self.table.selectRow(self.table_model.rowCount() - 1)
+        self.table.selectionModel().selectionChanged.connect(
+            self._table_selection_changed
+        )
 
     def _get_scheme(self):
         canvas = self.get_canvas_instance()
