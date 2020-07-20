@@ -8,7 +8,7 @@ import tempfile
 
 import time
 import unittest
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 from unittest.mock import Mock, patch
 from typing import List, Optional, TypeVar, Type
 
@@ -153,6 +153,8 @@ class GuiTest(unittest.TestCase):
 
     GuiTest ensures that a QApplication exists before tests are run an
     """
+    tear_down_stack: ExitStack
+
     @classmethod
     def setUpClass(cls):
         """Prepare for test execution.
@@ -171,13 +173,16 @@ class GuiTest(unittest.TestCase):
                 pass
             else:
                 appnope.nope()
+        cls.tear_down_stack = ExitStack()
         super().setUpClass()
+
 
     @classmethod
     def tearDownClass(cls) -> None:
         if "pyqtgraph" in sys.modules:
             import pyqtgraph
             pyqtgraph.setConfigOption("exitCleanup", False)
+        cls.tear_down_stack.close()
         super().tearDownClass()
         QTest.qWait(0)
 
@@ -227,7 +232,11 @@ class WidgetTest(GuiTest):
 
         report = OWReport()
         cls.widgets.append(report)
-        OWReport.get_instance = lambda: report
+
+        cls.tear_down_stack.enter_context(
+            patch.object(OWReport, "get_instance", lambda: report)
+        )
+
         if not (os.environ.get("TRAVIS") or os.environ.get("APPVEYOR")):
             report.show = Mock()
 
