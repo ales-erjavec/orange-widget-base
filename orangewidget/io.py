@@ -261,8 +261,10 @@ class MatplotlibPDFFormat(MatplotlibFormat):
 
     @classmethod
     def write_image(cls, filename, scene):
-        code = scene_code(scene) + "\n\nplt.savefig({})".format(repr(filename))
-        exec(code, {})  # will generate a pdf
+        import matplotlib
+        with matplotlib.rc_context({"backend": "pdf"}):
+            code = scene_code(scene) + "\n\nplt.savefig({})".format(repr(filename))
+            exec(code, {})  # will generate a pdf
 
 
 if QtCore.QT_VERSION >= 0x050C00:  # Qt 5.12+
