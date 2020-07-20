@@ -179,6 +179,7 @@ class GuiTest(unittest.TestCase):
             import pyqtgraph
             pyqtgraph.setConfigOption("exitCleanup", False)
         super().tearDownClass()
+        QTest.qWait(0)
 
 
 class WidgetTest(GuiTest):
@@ -232,12 +233,13 @@ class WidgetTest(GuiTest):
 
     @classmethod
     def tearDownClass(cls) -> None:
-        super().tearDownClass()
         cls.widgets.clear()
+        super().tearDownClass()
 
     def tearDown(self):
         """Process any pending events before the next test is executed."""
-        self.process_events()
+        # self.process_events()
+        QTest.qWait(0)
         super().tearDown()
 
     def create_widget(self, cls, stored_settings=None, reset_default_settings=True):
