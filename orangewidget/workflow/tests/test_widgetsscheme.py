@@ -162,6 +162,7 @@ class TestWidgetScheme(GuiTest):
         model.sync_node_properties()
 
         model.clear()
+        model.set_report_view(None)
 
 
 class TestWidgetManager(GuiTest):
