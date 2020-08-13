@@ -277,7 +277,7 @@ class TestWidgetManager(GuiTest):
 
     def test_state_init(self):
         def __init__(self, *args, **kwargs):
-            super(widget.OWBaseWidget, self).__init__(*args, **kwargs)
+            super(Adder, self).__init__(*args, **kwargs)
             self.setReady(False)
             self.setInvalidated(True)
             self.progressBarInit()

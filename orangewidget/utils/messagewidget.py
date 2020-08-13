@@ -38,7 +38,7 @@ def image_data(pm):
     pm = QPixmap(pm)
     device = QBuffer()
     assert device.open(QBuffer.ReadWrite)
-    pm.save(device, b'png')
+    pm.save(device, 'png')
     device.close()
     data = bytes(device.data())
     payload = base64.b64encode(data).decode("ascii")

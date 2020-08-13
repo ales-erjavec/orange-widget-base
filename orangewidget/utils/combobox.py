@@ -142,10 +142,10 @@ class ComboBoxSearch(QComboBox):
         self.__popup = None  # type: Optional[QAbstractItemModel]
         self.__proxy = None  # type: Optional[QSortFilterProxyModel]
         self.__popupTimer = QElapsedTimer()
+        kwargs.setdefault("focusPolicy", Qt.StrongFocus)
         super().__init__(parent, **kwargs)
         self.__searchline.setParent(self)
         self.__searchline.setFocusProxy(self)
-        self.setFocusPolicy(Qt.StrongFocus)
 
     def setMaximumContentsLength(self, length):  # type: (int) -> None
         """

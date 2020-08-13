@@ -165,7 +165,7 @@ class FutureWatcher(QObject, PyOwned):
     exceptionReady = Signal(BaseException)
 
     # A private event type used to notify the watcher of a Future's completion
-    __FutureDone = QEvent.registerEventType()
+    __FutureDone = QEvent.Type(QEvent.registerEventType())
 
     def __init__(self, future=None, parent=None, **kwargs):
         super().__init__(parent, **kwargs)

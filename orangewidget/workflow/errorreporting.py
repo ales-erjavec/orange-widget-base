@@ -92,7 +92,8 @@ class ErrorReporting(QDialog):
         super().__init__(None, Qt.Window, modal=True,
                          sizeGripEnabled=True, windowIcon=icon,
                          windowTitle='Unexpected Error',
-                         finished=_finished)
+                         )
+        self.finished.connect(_finished)
         self._data = data
 
         layout = QVBoxLayout(self)
@@ -114,7 +115,9 @@ class ErrorReporting(QDialog):
                                    font=font,
                                    openLinks=False,
                                    lineWrapMode=QTextBrowser.NoWrap,
-                                   anchorClicked=QDesktopServices.openUrl)
+                                   )
+        textbrowser.anchorClicked.connect(QDesktopServices.openUrl)
+
         layout.addWidget(textbrowser)
 
         def _reload_text():

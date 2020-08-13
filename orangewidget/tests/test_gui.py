@@ -133,7 +133,7 @@ class TestCheckBoxWithDisabledState(GuiTest):
         widget.some_option = False
         cb = gui.checkBox(widget, widget, "some_option", "foo",
                           stateWhenDisabled=False)
-        cb.clicked.emit(True)
+        cb.clicked[bool].emit(True)
         cb.setEnabled(False)
         cb.setEnabled(True)
         self.assertTrue(cb.isChecked())

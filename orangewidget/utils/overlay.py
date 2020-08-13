@@ -27,11 +27,13 @@ class OverlayWidget(QWidget):
     """
     A widget positioned on top of another widget.
     """
+    __widget = None
+
     def __init__(self, parent=None, alignment=Qt.AlignCenter, **kwargs):
+        self.__widget = None
+        self.__alignment = alignment
         super().__init__(parent, **kwargs)
         self.setContentsMargins(0, 0, 0, 0)
-        self.__alignment = alignment
-        self.__widget = None
 
     def setWidget(self, widget):
         """

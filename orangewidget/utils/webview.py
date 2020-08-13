@@ -24,7 +24,7 @@ from AnyQt.QtCore import Qt, QObject, QFile, QTimer, QUrl, QSize, QEventLoop, \
     pyqtProperty, pyqtSlot, pyqtSignal
 from AnyQt.QtGui import QColor
 from AnyQt.QtWidgets import QSizePolicy, QWidget, QApplication
-from AnyQt import sip
+from AnyQt.QtCore import isdeleted
 
 try:
     from AnyQt.QtWebKitWidgets import QWebView
@@ -110,7 +110,7 @@ if HAVE_WEBENGINE:
                     'See https://doc.qt.io/qt-5/qtwebengine-debugging.html '
                     'This has also been done for you.'.format(port=port))
             super().__init__(parent,
-                             sizeHint=QSize(500, 400),
+                             # sizeHint=QSize(500, 400),
                              sizePolicy=QSizePolicy(QSizePolicy.Expanding,
                                                     QSizePolicy.Expanding),
                              **kwargs)
@@ -414,7 +414,7 @@ def wait(until: callable, timeout=5000):
     """
     started = time.perf_counter()
     while not until():
-        QApplication.instance().processEvents(QEventLoop.ExcludeUserInputEvents)
+        QApplication.processEvents(QEventLoop.ExcludeUserInputEvents)
         if (time.perf_counter() - started) * 1000 > timeout:
             raise TimeoutError()
 
@@ -445,7 +445,7 @@ if HAVE_WEBKIT:
             _WebViewBase.__init__(self)
 
             def load_finished():
-                if not sip.isdeleted(self):
+                if not isdeleted(self):
                     self.frame.addToJavaScriptWindowObject(
                         '__bridge', _QWidgetJavaScriptWrapper(self))
                     self._evalJS('setTimeout(function(){'
@@ -569,7 +569,7 @@ elif HAVE_WEBENGINE:
 
         def _evalJS(self, code):
             wait(until=self._jsobject_channel.is_all_exposed)
-            if sip.isdeleted(self):
+            if isdeleted(self):
                 return None
             result = self._results.create()
             self.runJavaScript(code, lambda x: self._results.store(result, x))
@@ -582,7 +582,7 @@ elif HAVE_WEBENGINE:
 
         def html(self):
             self.page().toHtml(lambda html: setattr(self, '_html', html))
-            wait(until=lambda: self._html is not _NOTSET or sip.isdeleted(self))
+            wait(until=lambda: self._html is not _NOTSET or isdeleted(self))
             html, self._html = self._html, _NOTSET
             return html
 
