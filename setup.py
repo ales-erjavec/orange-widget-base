@@ -56,8 +56,9 @@ INSTALL_REQUIRES = [
     "matplotlib",
     "pyqtgraph",
     "AnyQt",
-    "orange-canvas-core>=0.1.8a,<0.2a",
-    'appnope; sys_platform=="darwin"'
+    "orange-canvas-core>=0.1.13,<0.2a",
+    'appnope; sys_platform=="darwin"',
+    'more-itertools',
 ]
 
 EXTRAS_REQUIRE = {

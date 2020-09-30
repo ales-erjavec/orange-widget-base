@@ -1,18 +1,26 @@
 import os
 import sys
 import typing
-from typing import Tuple
+import warnings
+from typing import Tuple, List, Sequence, Optional
 
-from AnyQt.QtCore import QFileInfo, Qt
+from more_itertools import unique_everseen
+
+from AnyQt.QtCore import QFileInfo, Qt, QSettings
 from AnyQt.QtGui import QBrush
 from AnyQt.QtWidgets import \
     QMessageBox, QFileDialog, QFileIconProvider, QComboBox
 
+from orangecanvas.utils import qualified_name
+from orangecanvas.utils.settings import \
+    QSettings_writeArray, QSettings_readArray
+
+from orangewidget import settings
 from orangewidget.io import Compression
 from orangewidget.settings import Setting
 
-
 if typing.TYPE_CHECKING:
+    from orangewidget.widget import OWBaseWidget
     from typing_extensions import Protocol
 else:
     from abc import ABC as Protocol
@@ -191,6 +199,16 @@ class RecentPath:
         self.sheet = sheet
         self.file_format = file_format
 
+    def as_dict(self):
+        return {
+            "abspath": self.abspath,
+            "prefix": self.prefix,
+            "relpath": self.relpath,
+            "title": self.title,
+            "sheet": self.sheet,
+            "file_format": self.file_format,
+        }
+
     def __eq__(self, other):
         return (self.abspath == other.abspath or
                 (self.prefix is not None and self.relpath is not None and
@@ -297,6 +315,55 @@ class RecentPath:
     __str__ = __repr__
 
 
+_RecentPathSchema = {
+    "abspath": str,
+    "prefix": (str, ""),
+    "relpath": (str, ""),
+    "title": (str, ""),
+    "sheet": (str, ""),
+    "file_format": (str, ""),
+}
+
+
+def read_recent_items(settings: QSettings) -> List[RecentPath]:
+    def make(*, prefix="", relpath="", file_format="", **kwargs) -> RecentPath:
+        return RecentPath(
+            prefix=prefix or None, relpath=relpath or None,
+            file_format=file_format or None, **kwargs)
+    items = QSettings_readArray(settings, "recent_path_items", _RecentPathSchema)
+    return [make(**item) for item in items]
+
+
+def write_recent_items(settings: QSettings, items: List[RecentPath]):
+    QSettings_writeArray(settings, "recent_path_items",
+                         [item.as_dict() for item in items])
+
+
+def prepend_recent_item(settings: QSettings, recent: RecentPath, max_count: int = None):
+    items = read_recent_items(settings)
+    if recent in items:
+        items.remove(recent)
+    items.insert(0, recent)
+    if max_count is not None:
+        items = items[:max_count]
+    write_recent_items(settings, items)
+
+
+def _relocate(
+        recent: RecentPath, search_paths: Sequence[Tuple[str, str]]
+) -> RecentPath:
+    kwargs = dict(title=recent.title, sheet=recent.sheet,
+                  file_format=recent.file_format)
+    resolved = recent.resolve(search_paths)
+    if resolved is not None:
+        recent = RecentPath.create(resolved.abspath, search_paths, **kwargs)
+    elif True:
+        path = recent.search(search_paths)
+        if path is not None:
+            recent = RecentPath.create(path, search_paths, **kwargs),
+    return recent
+
+
 class RecentPathsWidgetMixin:
     """
     Provide a setting with recent paths and relocation capabilities
@@ -329,46 +396,94 @@ class RecentPathsWidgetMixin:
 
     #: list with search paths; overload to add, say, documentation datasets dir
     SEARCH_PATHS = []
+    MAX_RECENT_ITEMS = 20
 
-    #: List[RecentPath]
-    recent_paths = Setting([])
+    recent_paths_default: Sequence[RecentPath] = ()
+    recent_paths: List[RecentPath] = []
+    current_path: Optional[RecentPath] = None
+
+    current_path_data: 'Optional[RecentPathData]' = Setting(None)
 
     _init_called = False
 
-    def __init__(self):
+    def __init__(self: 'OWBaseWidget'):
         super().__init__()
+        if isinstance(type(self).recent_paths, Setting):
+            warnings.warn(
+                "`RecentPathsWidgetMixin.recent_paths` is no longer "
+                "a Setting. This use is deprecated and will raise error in "
+                "the future ", FutureWarning, stacklevel=3,
+            )
         self._init_called = True
+        self.__restore_state()
         self._relocate_recent_files()
+        self.settingsAboutToBePacked.connect(self.__on_settingsAboutToBePacked)
+
+    def _local_settings(self) -> QSettings:
+        """Return a QSettings instance with local persistent settings."""
+        filename = "{}.ini".format(qualified_name(type(self)))
+        fname = os.path.join(settings.widget_settings_dir(), filename)
+        return QSettings(fname, QSettings.IniFormat)
+
+    def __restore_state(self):
+        settings = self._local_settings()
+        # preserve existing recent_paths if (still) defined;
+        # recent_paths were in the past 'Setting', subclasses could/did
+        # redefine them again (as Settings) so they are out of our control
+        recent_paths = self.recent_paths
+        recent_defaults = list(self.recent_paths_default)
+        search_paths = self._search_paths()
+        if self.current_path_data is not None:
+            current_path = _relocate(
+                RecentPath(**self.current_path_data), search_paths)
+            session_items = [current_path]
+        else:
+            current_path = None
+            session_items = []
+        recent_items = (session_items + recent_paths +
+                        read_recent_items(settings) + recent_defaults)
+        recent_items = [_relocate(item, search_paths) for item in recent_items]
+        recent_items = list(unique_everseen(
+            recent_items,
+            key=lambda item: (item.abspath, item.prefix, item.relpath)
+        ))
+        if current_path is not None:
+            self.current_path = current_path
+        self.recent_paths = recent_items
+
+    def __on_settingsAboutToBePacked(self):
+        if self.current_path is not None:
+            self.current_path_data = self.current_path.as_dict()
+        else:
+            self.current_path_data = None
 
     def _check_init(self):
         if not self._init_called:
             raise RuntimeError("RecentPathsWidgetMixin.__init__ was not called")
 
-    def _search_paths(self):
+    def _search_paths(self: 'OWBaseWidget'):
         basedir = self.workflowEnv().get("basedir", None)
         if basedir is None:
             return self.SEARCH_PATHS
         return self.SEARCH_PATHS + [("basedir", basedir)]
 
-    def _relocate_recent_files(self):
+    def _relocate_recent_files(self):  # TODO: Remove this
         self._check_init()
         search_paths = self._search_paths()
         rec = []
         for recent in self.recent_paths:
-            kwargs = dict(title=recent.title, sheet=recent.sheet, file_format=recent.file_format)
-            resolved = recent.resolve(search_paths)
-            if resolved is not None:
-                rec.append(
-                    RecentPath.create(resolved.abspath, search_paths, **kwargs))
-            elif recent.search(search_paths) is not None:
-                rec.append(
-                    RecentPath.create(recent.search(search_paths), search_paths, **kwargs)
-                )
-            else:
-                rec.append(recent)
+            rec.append(_relocate(recent, search_paths))
         # change the list in-place for the case the widgets wraps this list
         # in some model (untested!)
         self.recent_paths[:] = rec
+
+        if self.current_path is not None:
+            self.current_path = _relocate(self.current_path, search_paths)
+
+    def _store_recent_path(self, recent: RecentPath):
+        # Store the `recent` to user pref list.
+        settings = self._local_settings()
+        prepend_recent_item(settings, recent, self.MAX_RECENT_ITEMS)
 
     def add_path(self, filename):
         """Add (or move) a file name to the top of recent paths"""
@@ -377,16 +492,32 @@ class RecentPathsWidgetMixin:
         if recent in self.recent_paths:
             self.recent_paths.remove(recent)
         self.recent_paths.insert(0, recent)
+        self._store_recent_path(recent)
+        self.current_path = recent
 
     def select_file(self, n):
         """Move the n-th file to the top of the list"""
         recent = self.recent_paths[n]
         del self.recent_paths[n]
         self.recent_paths.insert(0, recent)
+        self._store_recent_path(recent)
 
     def last_path(self):
         """Return the most recent absolute path or `None` if there is none"""
-        return self.recent_paths[0].abspath if self.recent_paths else None
+        return self.current_path.abspath if self.current_path is not None else None
+        # return self.recent_paths[0].abspath if self.recent_paths else None
+
+    @staticmethod
+    def recent_paths_mixin_settings_migration_helper(settings):
+        paths = settings.pop("recent_paths", [])
+        if paths:
+            # Used to save all items, now only the 'last' in
+            # `current_path_data`.
+            last = paths[0]
+            current = last.as_dict()
+        else:
+            current = None
+        settings['current_path_data'] = current
 
 
 class RecentPathsWComboMixin(RecentPathsWidgetMixin):
