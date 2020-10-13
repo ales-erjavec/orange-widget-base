@@ -46,6 +46,7 @@ install:
   - pip install $BUILD_DEP
   - pip --version
   - pip list --format=freeze
+  - pip install git+https://github.com/ales-erjavec/orange-canvas-core@plugin-drag-drop
   - pip install $TEST_DEP
   - pip install -e .
 

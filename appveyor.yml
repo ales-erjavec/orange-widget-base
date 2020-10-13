@@ -50,7 +50,7 @@ test_script:
   - cd build\.test
   # Pre-populate the test environment
   - python -m pip install pip~=19.3 wheel
-
+  - python -m pip install git+https://github.com/ales-erjavec/orange-canvas-core@plugin-drag-drop
   - python -m pip install %TEST_DEP%
   - python -m pip install --no-index --no-deps -f ..\..\dist --pre %PROJECT_NAME%==%VERSION%
   - python -m pip install %PROJECT_NAME%==%VERSION%
