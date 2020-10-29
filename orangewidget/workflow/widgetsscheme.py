@@ -804,13 +804,7 @@ class WidgetsSignalManager(SignalManager):
         Process new signals for the OWBaseWidget.
         """
         workflow = self.workflow()
-        assert workflow is not None
-        app = QCoreApplication.instance()
-        try:
-            app.setOverrideCursor(Qt.WaitCursor)
-            process_signals_for_widget(widget, signals, workflow)
-        finally:
-            app.restoreOverrideCursor()
+        process_signals_for_widget(widget, signals, workflow)
 
 
 def get_input_meta(widget: OWBaseWidget, name: str) -> Optional[Input]:
