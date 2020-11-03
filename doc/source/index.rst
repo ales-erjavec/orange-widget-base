@@ -19,3 +19,4 @@ API
 .. toctree::
     concurrent
     messagewidget
+    drophandler
