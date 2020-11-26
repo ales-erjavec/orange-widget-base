@@ -372,6 +372,29 @@ class OWBaseWidget(QDialog, OWComponent, Report, ProgressBarMixin,
         editaction.setVisible(False)
 
         editaction.menu().addAction(self.__copy_action)
+        if sys.platform == "darwin" and mb.isNativeMenuBar():
+            # QTBUG-17291
+            editaction.menu().addAction(
+                QAction(
+                    "Cut", self, enabled=False,
+                    shortcut=QKeySequence(QKeySequence.Cut),
+            ))
+            editaction.menu().addAction(
+                QAction(
+                    "Copy", self, enabled=False,
+                    shortcut=QKeySequence(QKeySequence.Copy),
+            ))
+            editaction.menu().addAction(
+                QAction(
+                    "Paste", self, enabled=False,
+                    shortcut=QKeySequence(QKeySequence.Paste),
+            ))
+            editaction.menu().addAction(
+                QAction(
+                    "Select All", self, enabled=False,
+                    shortcut=QKeySequence(QKeySequence.SelectAll),
+            ))
+
         viewaction = mb.addMenu(_Menu("&View", mb, objectName="menu-view"))
         viewaction.setVisible(False)
         windowaction = mb.addMenu(_Menu("&Window", mb, objectName="menu-window"))
