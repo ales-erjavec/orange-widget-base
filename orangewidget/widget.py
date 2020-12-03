@@ -29,7 +29,7 @@ from orangewidget.utils.messages import (
     WidgetMessagesMixin, UnboundMsg, MessagesWidget
 )
 from orangewidget.utils.signals import (
-    WidgetSignalsMixin, Input, Output, Closed, AttributeList,
+    WidgetSignalsMixin, Input, Output, MultiInput, AttributeList,
     InputSignal, OutputSignal,
     Default, NonDefault, Single, Multiple, Dynamic, Explicit,
 )  # pylint: disable=unused-import
@@ -42,8 +42,8 @@ Msg = UnboundMsg
 
 
 __all__ = [
-    "OWBaseWidget", "Input", "Output", "AttributeList", "Message", "Msg",
-    "StateInfo", "Closed"
+    "OWBaseWidget", "Input", "Output", "MultiInput", "AttributeList",
+    "Message", "Msg", "StateInfo",
 ]
 
 

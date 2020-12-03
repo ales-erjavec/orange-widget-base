@@ -108,6 +108,73 @@ class Input(InputSignal, _Signal):
         return method
 
 
+class MultiInput(Input):
+    """
+    A special multiple input descriptor.
+
+    This type of input has explicit set/insert/remove interface to maintain
+    fully ordered sequence input. This should be preferred to the
+    plain `Input(..., multiple=True)` descriptor.
+
+    This input type must register three methods in the widget implementation
+    class corresponding to the insert, set/update and remove input commands::
+
+        class Inputs:
+            values = MultiInput("Values", object)
+        ...
+        @Inputs.values
+        def set_value(self, index: int, value: object):
+            "Set/update the value at index"
+            ...
+        @Inputs.values.insert
+        def insert_value(self, index: int, value: object):
+            "Insert value at specified index"
+            ...
+        @Inputs.values.remove
+        def remove_value(self, index: int):
+            "Remove value at index"
+            ...
+
+    Parameters
+    ----------
+    filter_none: bool
+        If `True` any `None` values sent by workflow execution
+        are implicitly converted to 'remove' notifications. When the value
+        again changes to non-None the input is re-inserted into its proper
+        position.
+
+
+    .. versionadded:: 4.12.0
+    """
+    insert_handler: str = None
+    remove_handler: str = None
+
+    def __init__(self, *args, filter_none=False, **kwargs):
+        multiple = kwargs.pop("multiple", True)
+        if not multiple:
+            raise ValueError("multiple cannot be set to False")
+        super().__init__(*args, multiple=True, **kwargs)
+        self.filter_none = filter_none
+        self.closing_sentinel = Closed
+
+    def insert(self, method):
+        """Register the method as the insert handler"""
+        self.insert_handler = method.__name__
+        return method
+
+    def remove(self, method):
+        """"Register the method as the remove handler"""
+        self.remove_handler = method.__name__
+        return method
+
+    def bound_signal(self, widget):
+        if self.insert_handler is None:
+            raise RuntimeError('insert_handler is not set')
+        if self.remove_handler is None:
+            raise RuntimeError('remove_handler is not set')
+        return super().bound_signal(widget)
+
+
 class Output(OutputSignal, _Signal):
     """
     Description of an output signal.

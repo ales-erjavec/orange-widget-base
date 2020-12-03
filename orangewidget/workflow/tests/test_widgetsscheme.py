@@ -61,26 +61,29 @@ class MakeList(widget.OWBaseWidget, openclass=True):
     seq = ()
 
     class Inputs:
-        element = widget.Input(
-            "Element", object, multiple=True,
-            closing_sentinel=widget.Input.Closed)
+        element = widget.MultiInput("Element", object)
 
     class Outputs:
         out = widget.Output("List", list)
 
     def __init__(self):
         super().__init__()
-        self.inputs = {}
+        self.inputs = []
 
     @Inputs.element
-    def set_element(self, el, id):
-        if el is widget.Input.Closed:
-            self.inputs.pop(id)
-        else:
-            self.inputs[id] = el
+    def set_element(self, index, el):
+        self.inputs[index] = el
+
+    @Inputs.element.insert
+    def insert_element(self, index, el):
+        self.inputs.insert(index, el)
+
+    @Inputs.element.remove
+    def remove_element(self, index):
+        self.inputs.pop(index)
 
     def handleNewSignals(self):
-        self.Outputs.out.send(list(self.inputs.values()))
+        self.Outputs.out.send(list(self.inputs))
 
 
 class AdderAsync(Adder):
@@ -381,7 +384,7 @@ class TestSignalManager(GuiTest):
         assert spy.wait()
         self.assertSequenceEqual(spy, [[widgets.add_node]])
 
-    def test_closing_input(self):
+    def test_multi_input(self):
         model, widgets = create_workflow_2()
         w1, w2, list_ = widgets.w1, widgets.w2, widgets.list_
         sm = model.signal_manager

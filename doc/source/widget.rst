@@ -93,6 +93,8 @@ is deprecated.
 
 .. autoclass:: Input
 
+.. autoclass:: MultiInput
+
 .. autoclass:: Output
 
 Sending/Receiving
