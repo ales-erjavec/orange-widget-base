@@ -93,7 +93,7 @@ class DummySignalManager:
     def clear(self):
         self.outputs.clear()
 
-    def send(self, widget, signal_name, value, id):
+    def send(self, widget, signal_name, value, *args, **kwargs):
         if not isinstance(signal_name, str):
             signal_name = signal_name.name
         current = self.outputs.get((widget, signal_name), None)

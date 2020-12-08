@@ -1,5 +1,6 @@
 import copy
 import itertools
+import warnings
 
 from orangecanvas.registry.description import (
     InputSignal, OutputSignal, Single, Multiple, Default, NonDefault,
@@ -221,12 +222,27 @@ class Output(OutputSignal, _Signal):
         self.widget = None
         self._seq_id = next(_counter)
 
-    def send(self, value, id=None):
+    def send(self, value, *args, **kwargs):
         """Emit the signal through signal manager."""
         assert self.widget is not None
+
+        def _id_(id):
+            return id
+        extra_args = ()
+        try:
+            id = _id_(*args, **kwargs)
+        except TypeError:
+            pass
+        else:
+            extra_args += (id,)
+            warnings.warn(
+                "`id` parameter is deprecated and will be removed in the "
+                "future", FutureWarning, stacklevel=2,
+            )
+
         signal_manager = self.widget.signalManager
         if signal_manager is not None:
-            signal_manager.send(self.widget, self.name, value, id)
+            signal_manager.send(self.widget, self.name, value, *extra_args)
 
     def invalidate(self):
         """Invalidate the current output value on the signal"""
@@ -254,18 +270,33 @@ class WidgetSignalsMixin:
                 setattr(bound_cls, name, signal.bound_signal(self))
             setattr(self, direction, bound_cls)
 
-    def send(self, signalName, value, id=None):
+    def send(self, signalName, value, *args, **kwargs):
         """
         Send a `value` on the `signalName` widget output.
 
         An output with `signalName` must be defined in the class ``outputs``
         list.
         """
+        def _id_(id=None):
+            return id
+        id_args = ()
+        try:
+            id = _id_(*args, **kwargs)
+        except TypeError:
+            pass
+        else:
+            id_args += (id,)
+            warnings.warn(
+                "`id` parameter is deprecated and will be removed in the "
+                "future.", FutureWarning, stacklevel=2
+            )
+
         if not any(s.name == signalName for s in self.outputs):
             raise ValueError('{} is not a valid output signal for widget {}'.format(
                 signalName, self.name))
+
         if self.signalManager is not None:
-            self.signalManager.send(self, signalName, value, id)
+            self.signalManager.send(self, signalName, value, *id_args)
 
     def handleNewSignals(self):
         """
