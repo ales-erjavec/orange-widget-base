@@ -22,6 +22,7 @@ from AnyQt.QtWidgets import (
 
 from orangewidget.report.owreport import OWReport
 from orangewidget.settings import SettingsHandler
+from orangewidget.utils.signals import get_input_meta, notify_input_helper
 from orangewidget.widget import OWBaseWidget
 
 sip.setdestroyonexit(False)
@@ -429,25 +430,20 @@ class WidgetTest(GuiTest):
             self.wait_until_finished(widget, timeout=wait)
 
     @staticmethod
-    def _send_signal(widget, input, value, *args):
+    def _send_signal(widget, input, value, *args, **kwargs):
+
         if isinstance(input, str):
-            for input_signal in widget.get_signals("inputs"):
-                if input_signal.name == input:
-                    input = input_signal
-                    break
-            else:
+            input = get_input_meta(widget, input)
+            if input is None:
                 raise ValueError("'{}' is not an input name for widget {}"
                                  .format(input, type(widget).__name__))
         if not widget.isReady():
             raise RuntimeError("'send_signal' called but the widget is not "
                                "in ready state and does not accept inputs.")
-        handler = getattr(widget, input.handler)
-
         # Assert sent input is of correct class
         assert isinstance(value, (input.type, type(None), type(input.closing_sentinel))), \
             '{} should be {}'.format(value.__class__.__mro__, input.type)
-
-        handler(value, *args)
+        notify_input_helper(input, widget, value, *args, **kwargs)
 
     def wait_until_stop_blocking(self, widget=None, wait=DEFAULT_TIMEOUT):
         """Wait until the widget stops blocking i.e. finishes computation.
