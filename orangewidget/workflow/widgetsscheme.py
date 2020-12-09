@@ -820,7 +820,7 @@ def index_of(seq, el):
     for i, e in enumerate(seq):
         if el == e:
             return i
-    raise ValueError(el)
+    return None
 
 
 @singledispatch

@@ -1,7 +1,8 @@
 import copy
 import itertools
 import warnings
-from typing import Optional, Iterable
+from functools import singledispatch
+from typing import Optional, Iterable, Dict, Tuple, Any, Sequence, Callable
 
 from orangecanvas.registry.description import (
     InputSignal, OutputSignal, Single, Multiple, Default, NonDefault,
@@ -393,6 +394,138 @@ def get_input_meta(widget: WidgetSignalsMixin, name: str) -> Optional[Input]:
         if input_.name == name:
             return input_
     return None
+
+
+def get_widget_inputs(
+        widget: WidgetSignalsMixin
+) -> Dict[str, Sequence[Tuple[Any, Any]]]:
+    state: Dict[str, Sequence[Tuple[Any, Any]]]
+    state = widget.__dict__.setdefault(
+        "_WidgetSignalsMixin__input_state", {}
+    )
+    return state
+
+
+@singledispatch
+def notify_input_helper(
+        input: Input, widget: WidgetSignalsMixin, obj, key=None, index=-1
+) -> None:
+    """
+    Set the input to the `widget` in a way appropriate for the `input` type.
+    """
+    raise NotImplementedError
+
+
+@notify_input_helper.register(Input)
+def set_input_helper(
+        input: Input, widget: WidgetSignalsMixin, obj, key=None, index=-1
+):
+    handler = getattr(widget, input.handler)
+    if input.single:
+        args = (obj,)
+    else:
+        args = (obj, key)
+    handler(*args)
+
+
+@notify_input_helper.register(MultiInput)
+def set_multi_input_helper(
+        input: MultiInput, widget: WidgetSignalsMixin, obj, key=None, index=-1,
+):
+    """
+    Set/update widget's input for a `MultiInput` input to obj.
+
+    `key` must be a unique for an input slot to update.
+    `index` defines the position where a new input (key that did not
+    previously exist) is inserted. The default -1 indicates that the
+    new input should be appended to the end. An input is removed by using
+    inout.closing_sentinel as the obj.
+    """
+    inputs_ = get_widget_inputs(widget)
+    inputs = list(inputs_.setdefault(input.name, ()))
+    filter_none = input.filter_none
+
+    signal_old = None
+    key_to_pos = {key: i for i, (key, _) in enumerate(inputs)}
+    update = key in key_to_pos
+    new = key not in key_to_pos
+    remove = obj is input.closing_sentinel
+    if new:
+        if not 0 <= index < len(inputs):
+            index = len(inputs)
+    else:
+        index = key_to_pos.get(key)
+        assert index is not None
+
+    if new:
+        inputs.insert(index, (key, obj))
+    elif remove:
+        signal_old = inputs.pop(index)
+    else:
+        signal_old = inputs[index]
+        inputs[index] = (key, obj)
+
+    inputs_[input.name] = tuple(inputs)
+
+    if filter_none:
+        def filter_f(obj):
+            return obj is None
+    else:
+        filter_f = None
+
+    def local_index(
+            key: Any, inputs: Sequence[Tuple[Any, Any]],
+            filter: Optional[Callable[[Any], bool]] = None,
+    ) -> Optional[int]:
+        i = 0
+        for k, obj in inputs:
+            if key == k:
+                return i
+            elif filter is not None:
+                i += int(not filter(obj))
+            else:
+                i += 1
+        return None
+
+    if filter_none:
+        # normalize signal.value is None to Close signal.
+        filtered = filter_f(obj)
+        if new and filtered:
+            # insert in inputs only (done above)
+            return
+        elif remove:
+            if filter_f(signal_old[1]):
+                # was already removed, only remove from inputs (done above)
+                return
+        elif update and filtered:
+            if filter_f(signal_old[1]):
+                # did not change; remains filtered
+                return
+            else:
+                # remove it
+                remove = True
+                new = False
+                index = local_index(key, inputs, filter_f)
+                assert index is not None
+
+        if signal_old is not None and filter_f(signal_old[1]) and not filtered:
+            # update with non-none value, substitute as new signal
+            new = True
+            remove = False
+            index = local_index(key, inputs, filter_f)
+
+    if new:
+        handler = input.insert_handler
+        args = (index, obj)
+    elif remove:
+        handler = input.remove_handler
+        args = (index, )
+    else:
+        handler = input.handler
+        args = (index, obj)
+    assert index is not None
+    handler = getattr(widget, handler)
+    handler(*args)
 
 
 class AttributeList(list):
