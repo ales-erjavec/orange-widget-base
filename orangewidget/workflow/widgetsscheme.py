@@ -47,7 +47,7 @@ from orangecanvas.scheme.node import UserMessage
 from orangecanvas.scheme.widgetmanager import WidgetManager as _WidgetManager
 from orangecanvas.utils import name_lookup
 from orangecanvas.resources import icon_loader
-from orangewidget.utils.signals import MultiInput
+from orangewidget.utils.signals import MultiInput, get_input_meta
 
 from orangewidget.widget import OWBaseWidget, Input
 from orangewidget.report.owreport import OWReport

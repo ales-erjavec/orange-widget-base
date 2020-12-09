@@ -31,7 +31,7 @@ from orangewidget.utils.messages import (
 from orangewidget.utils.signals import (
     WidgetSignalsMixin, Input, Output, MultiInput, AttributeList,
     InputSignal, OutputSignal,
-    Default, NonDefault, Single, Multiple, Dynamic, Explicit,
+    Default, NonDefault, Single, Multiple, Dynamic, Explicit, get_input_meta,
 )  # pylint: disable=unused-import
 from orangewidget.utils.overlay import MessageOverlayWidget, OverlayWidget
 from orangewidget.utils.buttons import SimpleButton
