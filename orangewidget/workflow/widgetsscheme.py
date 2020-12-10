@@ -21,6 +21,7 @@ companion :class:`WidgetsSignalManager` class.
 import copy
 import logging
 import enum
+import operator
 import types
 import warnings
 from functools import singledispatch
@@ -28,8 +29,9 @@ from functools import singledispatch
 from urllib.parse import urlencode
 from weakref import finalize
 
-from typing import Optional, Dict, Any, List, overload, Iterable, Tuple, \
-    Sequence
+from typing import (
+    Optional, Dict, Any, List, overload, Sequence, TypeVar, Callable
+)
 
 from AnyQt.QtWidgets import QWidget, QAction
 from AnyQt.QtGui import QWhatsThisClickedEvent
@@ -47,7 +49,7 @@ from orangecanvas.scheme.node import UserMessage
 from orangecanvas.scheme.widgetmanager import WidgetManager as _WidgetManager
 from orangecanvas.utils import name_lookup
 from orangecanvas.resources import icon_loader
-from orangewidget.utils.signals import MultiInput, get_input_meta
+from orangewidget.utils.signals import get_input_meta, notify_input_helper
 
 from orangewidget.widget import OWBaseWidget, Input
 from orangewidget.report.owreport import OWReport
@@ -816,9 +818,21 @@ class WidgetsSignalManager(SignalManager):
         process_signals_for_widget(widget, signals, workflow)
 
 
-def index_of(seq, el):
+T = TypeVar("T")
+
+
+def index_of(
+        seq: Sequence[T],
+        el: T,
+        eq: Callable[[T, T], bool] = operator.eq,
+) -> Optional[int]:
+    """
+    Return index of `el` in `seq` where equality is defined by `eq`.
+
+    Return None if not found.
+    """
     for i, e in enumerate(seq):
-        if el == e:
+        if eq(el, e):
             return i
     return None
 
@@ -833,31 +847,39 @@ def process_signal_input_default(
         input: Input, widget: OWBaseWidget, signal: Signal
 ):
     inputs = get_widget_input_signals(widget)
+    index = signal.index
+    value = signal.value
 
+    index_existing = index_of(inputs, signal, eq=same_input_slot)
+    if index < 0 and index_existing is not None:
+        index = index_existing
+    elif index_existing is not None:
+        index = index_existing
+
+    # 'input local' index i.e. which connection to the same (multiple) input.
+    index_local = index_of(
+        (s.link for s in inputs if s.channel.name == input.name),
+        signal.link,
+    )
     if isinstance(signal, Signal.New):
-        assert 0 <= signal.index <= len(inputs)
-        signal = Signal(*signal)
-        inputs.insert(signal.index, signal)
+        if not 0 <= index < len(inputs):
+            index = len(inputs)
+        inputs.insert(index, signal)
+        index_local = index_of(
+            (s.link for s in inputs if s.channel.name == input.name),
+            signal.link,
+        )
     elif isinstance(signal, Signal.Close):
-        assert inputs[signal.index].link == signal.link
-        assert inputs[signal.index].id == signal.id
-        inputs.pop(signal.index)
+        old = inputs.pop(index)
+        assert old.link == signal.link
+        value = input.closing_sentinel
     else:
-        assert inputs[signal.index].link == signal.link
-        assert inputs[signal.index].id == signal.id
-        inputs[signal.index] = Signal(*signal)
+        assert inputs[index].link == signal.link
+        inputs[index] = signal
 
-    link = signal.link
-    handler = input.handler
-    handler = getattr(widget, handler)
-    if input.single:
-        args = (signal.value,)
-    else:
-        source_id = id(link)
-        args = (signal.value, (source_id, link.source_channel.name, signal.id, ))
-    log.debug("Process signals: calling %s.%s (from %s with id:%s)",
-              type(widget).__name__, handler.__name__, link, signal.id)
-    handler(*args)
+    notify_input_helper(
+        input, widget, value, key=signal.link, index=index_local
+    )
 
 
 def get_widget_input_signals(widget: OWBaseWidget) -> List[Signal]:
@@ -868,98 +890,8 @@ def get_widget_input_signals(widget: OWBaseWidget) -> List[Signal]:
     return inputs
 
 
-@process_signal_input.register(MultiInput)
-def process_signal_input_multi_input(
-        input: MultiInput, widget: OWBaseWidget, signal: Signal
-):
-    link = signal.link
-    inputs = get_widget_input_signals(widget)
-    filter_none = input.filter_none
-
-    def local_index(
-            signal: Signal, inputs: Sequence[Signal],
-            filter_none=False,
-    ) -> Optional[int]:
-        # map the signal.index to channel local index
-        channel = signal.link.sink_channel
-        sigs = [(s.link, s.id) for s in inputs
-                if s.link.sink_channel.name == channel.name
-                   and (not filter_none or s.value is not None)]
-        try:
-            return sigs.index((signal.link, signal.id))
-        except ValueError:
-            return None
-
-    inputs_old = inputs.copy()
-    signal_old = None
-    if isinstance(signal, Signal.New):
-        assert 0 <= signal.index <= len(inputs)
-        inputs.insert(signal.index, Signal(*signal))
-    elif isinstance(signal, Signal.Close):
-        assert 0 <= signal.index < len(inputs)
-        assert inputs[signal.index].link == signal.link
-        assert inputs[signal.index].id == signal.id
-        inputs.pop(signal.index)
-        signal_old = inputs_old[signal.index]
-    elif isinstance(signal, Signal.Update):
-        assert 0 <= signal.index < len(inputs)
-        assert inputs[signal.index].link == signal.link
-        assert inputs[signal.index].id == signal.id
-        inputs[signal.index] = Signal(*signal)
-        signal_old = inputs_old[signal.index]
-    else:
-        raise TypeError
-
-    if filter_none:
-        # normalize signal.value is None to Close signal.
-        if isinstance(signal, Signal.New) and signal.value is None:
-            # insert in inputs only (done above)
-            log.debug("Skip `None` update")
-            return
-        elif isinstance(signal, Signal.Close):
-            if signal_old.value is None:
-                # was already closed, only remove from inputs (done above)
-                log.debug("Skip `None` update")
-                return
-        elif isinstance(signal, Signal.Update) and signal.value is None:
-            if signal_old.value is None:
-                # did not change
-                log.debug("Skip `None` update")
-                return
-            else:
-                # close
-                log.debug(
-                    "Implicit Close signal for `None` value update (%s)",
-                    signal
-                )
-                signal = Signal.Close(*signal)
-
-        if signal_old is not None and signal_old.value is None \
-                and signal.value is not None:
-            # update with non-none value, substitute as new signal
-            log.debug(
-                "Implicit New signal for non-`None` value update (%s)",
-                signal
-            )
-            signal = Signal.New(*signal)
-
-    if isinstance(signal, Signal.New):
-        handler = input.insert_handler
-        index = local_index(signal, inputs, filter_none)
-        args = (index, signal.value)
-    elif isinstance(signal, Signal.Close):
-        handler = input.remove_handler
-        index = local_index(signal, inputs_old, filter_none)
-        args = (index, )
-    else:
-        handler = input.handler
-        index = local_index(signal, inputs, filter_none)
-        args = (index, signal.value)
-    assert index is not None
-    handler = getattr(widget, handler)
-    log.debug("Process signals: calling %s.%s (from %s with index:%s)",
-              type(widget).__name__, handler.__name__, link, index)
-    handler(*args)
+def same_input_slot(s1: Signal, s2: Signal) -> bool:
+    return s1.link == s2.link
 
 
 @singledispatch
@@ -979,31 +911,7 @@ def process_signals_for_widget(widget, signals, workflow):
     Process new signals for the OWBaseWidget.
     """
     for signal in signals:
-        link = signal.link
-        input_meta = get_input_meta(widget, link.sink_channel.name)
-        assert input_meta is not None
-        value = signal.value
-        handler = input_meta.handler
-        handler = getattr(widget, handler)
+        input_meta = get_input_meta(widget, signal.channel.name)
+        process_signal_input(input_meta, widget, signal)
 
-        if link not in workflow.links:
-            value = input_meta.closing_sentinel
-
-        if input_meta.single:
-            args = (value,)
-        else:
-            args = (value, signal.id)
-        log.debug("Process signals: calling %s.%s (from %s with id:%s)",
-                  type(widget).__name__, handler.__name__, link, signal.id)
-        try:
-            handler(*args)
-        except Exception:
-            log.exception("Error calling '%s' of '%s'",
-                          handler.__name__, widget.captionTitle)
-            raise
-    try:
-        widget.handleNewSignals()
-    except Exception:
-        log.exception("Error calling 'handleNewSignals()' of '%s'",
-                      widget.captionTitle)
-        raise
+    handle_new_signals(widget, workflow)
