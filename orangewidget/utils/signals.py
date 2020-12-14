@@ -526,7 +526,3 @@ def set_multi_input_helper(
     assert index is not None
     handler = getattr(widget, handler)
     handler(*args)
-
-
-class AttributeList(list):
-    """Signal type for lists of attributes (variables)"""
