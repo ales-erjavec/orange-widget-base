@@ -838,14 +838,28 @@ def index_of(
 
 
 @singledispatch
-def process_signal_input(input, widget, signal):
+def process_signal_input(
+        input: Input,
+        widget: OWBaseWidget,
+        signal: Signal,
+        workflow: WidgetsScheme
+) -> None:
+    """
+    Deliver the `signal` from the workflow to the widget.
+
+    This is a generic handler. The default handles `Input` and `MultiInput`
+    inputs.
+    """
     raise NotImplementedError
 
 
 @process_signal_input.register(Input)
 def process_signal_input_default(
-        input: Input, widget: OWBaseWidget, signal: Signal
+        input: Input, widget: OWBaseWidget, signal: Signal,
+        workflow: WidgetsScheme
 ):
+    """
+    """
     inputs = get_widget_input_signals(widget)
     index = signal.index
     value = signal.value
@@ -896,22 +910,24 @@ def same_input_slot(s1: Signal, s2: Signal) -> bool:
 
 @singledispatch
 def handle_new_signals(widget, workflow: WidgetsScheme):
-    return NotImplemented
+    """
+    Invoked by the workflow signal propagation manager after all
+    input signal update handlers have been called.
 
-
-@handle_new_signals.register(OWBaseWidget)
-def _handle_new_signals(widget: OWBaseWidget, workflow: WidgetsScheme):
+    The default implementation for OWBaseWidget calls
+    `OWBaseWidget.handleNewSignals`
+    """
     widget.handleNewSignals()
 
 
 @singledispatch
 def process_signals_for_widget(widget, signals, workflow):
-    # type: (OWBaseWidget, List[Signal], Scheme) -> None
+    # type: (OWBaseWidget, List[Signal], WidgetsScheme) -> None
     """
     Process new signals for the OWBaseWidget.
     """
     for signal in signals:
         input_meta = get_input_meta(widget, signal.channel.name)
-        process_signal_input(input_meta, widget, signal)
+        process_signal_input(input_meta, widget, signal, workflow)
 
     handle_new_signals(widget, workflow)
