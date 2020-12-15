@@ -386,7 +386,7 @@ class TestSignalManager(GuiTest):
 
     def test_multi_input(self):
         model, widgets = create_workflow_2()
-        w1, w2, list_ = widgets.w1, widgets.w2, widgets.list_
+        w1, w2 = widgets.w1, widgets.w2
         sm = model.signal_manager
         spy = QSignalSpy(widgets.list_node.state_changed)
         show_link = model.find_links(
@@ -417,6 +417,79 @@ class TestSignalManager(GuiTest):
         model.insert_link(0, link)
         w1.Outputs.out.send(None)
         check_inputs([None, -42])
+
+    @unittest.mock.patch.object(MakeList.Inputs.element, "filter_none", True)
+    def test_multi_input_filter_none(self):
+        # Test MultiInput.filter_none
+        model, widgets = create_workflow_2()
+        w1, w2, list_ = widgets.w1, widgets.w2, widgets.list_
+        spy = QSignalSpy(widgets.list_node.state_changed)
+        w1.Outputs.out.send(42)
+        w2.Outputs.out.send(None)
+
+        def check_inputs(expected: list):
+            if widgets.list_node.state() & SchemeNode.Pending:
+                self.assertTrue(spy.wait())
+            self.assertEqual(list_.inputs, expected)
+
+        w1.Outputs.out.send(None)
+        w2.Outputs.out.send(-42)
+        check_inputs([-42])
+
+        w1.Outputs.out.send(42)
+        check_inputs([42, -42])
+
+        w1.Outputs.out.send(None)
+        check_inputs([-42])
+        w2.Outputs.out.send(None)
+        check_inputs([])
+
+        w2.Outputs.out.send(2)
+        check_inputs([2])
+
+        w1.Outputs.out.send(1)
+        check_inputs([1, 2])
+
+        w2.Outputs.out.send(None)
+        check_inputs([1])
+
+        w2.Outputs.out.send(2)
+        check_inputs([1, 2])
+
+        l1= model.find_links(widgets.w1_node, None, widgets.list_node, None)[0]
+        model.remove_link(l1)
+        check_inputs([2])
+
+        model.insert_link(0, l1)
+        check_inputs([1, 2])
+
+        l2 = model.find_links(widgets.w2_node, None, widgets.list_node, None)[0]
+        model.remove_link(l2)
+        check_inputs([1])
+
+        model.insert_link(1, l2)
+        check_inputs([1, 2])
+
+        model.remove_link(l1)
+        check_inputs([2])
+
+        model.insert_link(0, l1)
+        w1.Outputs.out.send(None)
+        check_inputs([2])
+        w1.Outputs.out.send(None)
+        check_inputs([2])
+
+        model.remove_link(l1)
+        model.insert_link(0, l1)
+        check_inputs([2])
+
+        w1.Outputs.out.send(1)
+        check_inputs([1, 2])
+
+        w1.Outputs.out.send(None)
+        check_inputs([2])
+        model.remove_link(l1)
+        check_inputs([2])
 
     def test_old_style_input(self):
         model, widgets = create_workflow()
