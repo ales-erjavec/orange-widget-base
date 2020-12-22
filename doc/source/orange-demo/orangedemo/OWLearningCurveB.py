@@ -1,5 +1,5 @@
-from collections import OrderedDict
 from functools import reduce
+from typing import List, Optional, Sequence
 
 import numpy
 
@@ -9,10 +9,25 @@ import Orange.data
 import Orange.classification
 import Orange.evaluation
 
+from Orange.classification import Learner
+from Orange.data import Table
+from Orange.evaluation.testing import Results
+
 from orangewidget import gui, settings
 from orangewidget.utils.widgetpreview import WidgetPreview
-from orangewidget.widget import OWBaseWidget, Input
-from Orange.evaluation.testing import Results
+from orangewidget.widget import OWBaseWidget, Input, MultiInput
+
+
+class LearnerData:
+    def __init__(
+            self,
+            learner: Learner,
+            results: Optional[Results] = None,
+            curve: Optional[Sequence[float]] = None,
+    ) -> None:
+        self.learner = learner
+        self.results = results
+        self.curve = curve
 
 
 class OWLearningCurveB(OWBaseWidget):
@@ -24,10 +39,9 @@ class OWLearningCurveB(OWBaseWidget):
 
 # [start-snippet-1]
     class Inputs:
-        data = Input("Data", Orange.data.Table, default=True)
-        test_data = Input("Test Data", Orange.data.Table)
-        learner = Input("Learner", Orange.classification.Learner,
-                        multiple=True)
+        data = Input("Data", Table, default=True)
+        test_data = Input("Test Data", Table)
+        learner = MultiInput("Learner", Learner)
 # [end-snippet-1]
 
     #: cross validation folds
@@ -52,18 +66,12 @@ class OWLearningCurveB(OWBaseWidget):
             ("Precision", Orange.evaluation.scoring.Precision),
             ("Recall", Orange.evaluation.scoring.Recall)
         ]
-        #: input data on which to construct the learning curve
+        #: Input data on which to construct the learning curve
         self.data = None
-        #: optional test data
+        #: Optional test data
         self.testdata = None
-        #: A {input_id: Learner} mapping of current learners from input channel
-        self.learners = OrderedDict()
-        #: A {input_id: List[Results]} mapping of input id to evaluation
-        #: results list, one for each curve point
-        self.results = OrderedDict()
-        #: A {input_id: List[float]} mapping of input id to learning curve
-        #: point scores
-        self.curves = OrderedDict()
+        #: LearnerData for each learner input
+        self.learners: List[LearnerData] = []
 
         # GUI
         box = gui.widgetBox(self.controlArea, "Info")
@@ -105,11 +113,10 @@ class OWLearningCurveB(OWBaseWidget):
     @Inputs.data
     def set_dataset(self, data):
         """Set the input train dataset."""
-        # Clear all results/scores
-        for id in list(self.results):
-            self.results[id] = None
-        for id in list(self.curves):
-            self.curves[id] = None
+        # Clear all results/scores for all learner inputs
+        for item in self.learners:
+            item.results = None
+            item.curve = None
 
         self.data = data
 
@@ -123,38 +130,34 @@ class OWLearningCurveB(OWBaseWidget):
     @Inputs.test_data
     def set_testdataset(self, testdata):
         """Set a separate test dataset."""
-        # Clear all results/scores
-        for id in list(self.results):
-            self.results[id] = None
-        for id in list(self.curves):
-            self.curves[id] = None
+        # Clear all results/scores for all learner inputs
+        for item in self.learners:
+            item.results = None
+            item.curve = None
 
         self.testdata = testdata
 
     @Inputs.learner
-    def set_learner(self, learner, id):
-        """Set the input learner for channel id."""
-        if id in self.learners:
-            if learner is None:
-                # remove a learner and corresponding results
-                del self.learners[id]
-                del self.results[id]
-                del self.curves[id]
-            else:
-                # update/replace a learner on a previously connected link
-                self.learners[id] = learner
-                # invalidate the cross-validation results and curve scores
-                # (will be computed/updated in `_update`)
-                self.results[id] = None
-                self.curves[id] = None
-        else:
-            if learner is not None:
-                self.learners[id] = learner
-                # initialize the cross-validation results and curve scores
-                # (will be computed/updated in `_update`)
-                self.results[id] = None
-                self.curves[id] = None
+    def set_learner(self, index: int, learner):
+        """Set the input learner at index"""
+        # update/replace a learner on a previously connected link
+        item = self.learners[index]
+        item.learner = learner
+        item.results = None
+        item.curve = None
 
+    @Inputs.learner.insert
+    def insert_learner(self, index, learner):
+        """Insert a learner at index"""
+        self.learners.insert(index, LearnerData(learner, None, None))
+
+    @Inputs.learner.remove
+    def remove_learner(self, index):
+        """"Remove a learner at index"""
+        # remove a learner and corresponding results
+        del self.learners[index]
+
+    def handleNewSignals(self):
         if len(self.learners):
             self.infob.setText("%d learners on input." % len(self.learners))
         else:
@@ -162,7 +165,6 @@ class OWLearningCurveB(OWBaseWidget):
 
         self.commitBtn.setEnabled(len(self.learners))
 
-    def handleNewSignals(self):
         if self.data is not None:
             self._update()
             self._update_curve_points()
@@ -174,9 +176,9 @@ class OWLearningCurveB(OWBaseWidget):
         self._update_table()
 
     def _invalidate_results(self):
-        for id in self.learners:
-            self.curves[id] = None
-            self.results[id] = None
+        for item in self.learners:
+            item.results = None
+            item.curve = None
 
         if self.data is not None:
             self._update()
@@ -186,11 +188,12 @@ class OWLearningCurveB(OWBaseWidget):
     def _update(self):
         assert self.data is not None
         # collect all learners for which results have not yet been computed
-        need_update = [(id, learner) for id, learner in self.learners.items()
-                       if self.results[id] is None]
+        need_update = [(i, item) for (i, item) in enumerate(self.learners)
+                       if item.results is None]
         if not need_update:
             return
-        learners = [learner for _, learner in need_update]
+
+        learners = [item.learner for _, item in need_update]
 
         if self.testdata is None:
             # compute the learning curve result for all learners in one go
@@ -204,16 +207,16 @@ class OWLearningCurveB(OWBaseWidget):
                 proportions=self.curvePoints,
             )
         # split the combined result into per learner/model results
-        results = [list(Results.split_by_model(p_results)) for p_results in results]
+        results = [list(Results.split_by_model(p_results))
+                   for p_results in results]
 
-        for i, (id, learner) in enumerate(need_update):
-            self.results[id] = [p_results[i] for p_results in results]
+        for i, (_, item) in enumerate(need_update):
+            item.results = [p_results[i] for p_results in results]
 
     def _update_curve_points(self):
-        for id in self.learners:
-            curve = [self.scoring[self.scoringF][1](x)[0]
-                     for x in self.results[id]]
-            self.curves[id] = curve
+        scoref = self.scoring[self.scoringF][1]
+        for item in self.learners:
+            item.curve = [scoref(x)[0] for x in item.results]
 
     def _update_table(self):
         self.table.setRowCount(0)
@@ -221,15 +224,15 @@ class OWLearningCurveB(OWBaseWidget):
         self.table.setColumnCount(len(self.learners))
 
         self.table.setHorizontalHeaderLabels(
-            [learner.name for _, learner in self.learners.items()])
+            [item.learner.name for item in self.learners])
         self.table.setVerticalHeaderLabels(
             ["{:.2f}".format(p) for p in self.curvePoints])
 
         if self.data is None:
             return
 
-        for column, curve in enumerate(self.curves.values()):
-            for row, point in enumerate(curve):
+        for column, item in enumerate(self.learners):
+            for row, point in enumerate(item.curve):
                 self.table.setItem(
                     row, column, QTableWidgetItem("{:.5f}".format(point)))
 
@@ -240,30 +243,6 @@ class OWLearningCurveB(OWBaseWidget):
 
     def updateCurvePoints(self):
         self.curvePoints = [(x + 1.)/self.steps for x in range(self.steps)]
-
-# [start-snippet-3]
-    def test_run_signals(self):
-        data = Orange.data.Table("iris")
-        indices = numpy.random.permutation(len(data))
-
-        traindata = data[indices[:-20]]
-        testdata = data[indices[-20:]]
-
-        self.set_dataset(traindata)
-        self.set_testdataset(testdata)
-
-        l1 = Orange.classification.NaiveBayesLearner()
-        l1.name = 'Naive Bayes'
-        self.set_learner(l1, 1)
-
-        l2 = Orange.classification.LogisticRegressionLearner()
-        l2.name = 'Logistic Regression'
-        self.set_learner(l2, 2)
-
-        l4 = Orange.classification.SklTreeLearner()
-        l4.name = "Decision Tree"
-        self.set_learner(l4, 3)
-# [end-snippet-3]
 
 
 def learning_curve(learners, data, folds=10, proportions=None,

@@ -55,35 +55,35 @@ widget are defined by
 
 
 Notice that everything is pretty much the same as it was with
-widgets from previous lessons, the only difference being the additional argument
-``multiple=True``, which says that this input can be connected to outputs of
-multiple widgets.
+widgets from previous lessons, the only difference being that we use a
+:class:`~orangewidget.utils.signals.MultiInput` in the input declaration,
+which says that this input can be connected to outputs of multiple widgets.
 
-Handlers of multiple-input signals must accept two arguments: the sent object
-and the id of the sending widget.
+Handlers of multiple-input signals **must** decorate a triplet of methods
+for the set/insert/remove operations.
+
+The insert method takes an integer index and the input object instance and
+must insert the object at the position specified by index.
+
+.. literalinclude:: orange-demo/orangedemo/OWLearningCurveA.py
+   :pyobject: OWLearningCurveA.insert_learner
+
+The set method updates the input at existing specified index.
 
 .. literalinclude:: orange-demo/orangedemo/OWLearningCurveA.py
    :pyobject: OWLearningCurveA.set_learner
 
-OK, this looks like one long and complicated function. But be
-patient! Learning curve is not the simplest widget there is, so
-there's some extra code in the function above to manage the
-information it handles in the appropriate way. To understand the
-signals, though, you should only understand the following. We store
-the learners (objects that learn from data) in an
-:class:`~collections.OrderedDict` :obj:`self.learners`. This dictionary
-is a mapping of input *id* to the input value (the input learner itself).
-The reason this is an :class:`~collections.OrderedDict` is that the order
-of the input learners is important as we want to maintain a consistent column
-order in the table view of the learning curve point scores.
 
-The function above first checks if the channel `id` is already in
-:obj:`self.learners` and if so either deletes the corresponding entry if
-``learner`` is ``None`` (remember receiving a ``None`` value means the
-link was removed/closed) or invalidates the cross validation results
-and curve point for that channel id, marking for update in
-:func:`~orangewidget.widget.OWBaseWidget.handleNewSignals`. A similar case is
-when we receive a learner for a new channel id.
+Finally the remove method removes the input at the specified index.
+
+.. literalinclude:: orange-demo/orangedemo/OWLearningCurveA.py
+   :pyobject: OWLearningCurveA.remove_learner
+
+We store the learners (objects that learn from data) and the associates
+computed results in an list of `LearnerData` objects.
+
+.. literalinclude:: orange-demo/orangedemo/OWLearningCurveA.py
+   :pyobject: LearnerData
 
 Note that in this widget the evaluation (k-fold cross
 validation) is carried out just once given the learner, dataset and
