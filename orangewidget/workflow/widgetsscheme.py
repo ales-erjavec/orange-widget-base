@@ -25,12 +25,13 @@ import operator
 import types
 import warnings
 from functools import singledispatch
+from itertools import count
 
 from urllib.parse import urlencode
-from weakref import finalize
+from weakref import finalize, WeakKeyDictionary
 
 from typing import (
-    Optional, Dict, Any, List, overload, Sequence, TypeVar, Callable
+    Optional, Dict, Any, List, overload, Sequence, TypeVar, Callable, Mapping
 )
 
 from AnyQt.QtWidgets import QWidget, QAction
@@ -837,6 +838,28 @@ def index_of(
     return None
 
 
+class WeakKeyDefaultDict(WeakKeyDictionary):
+    """
+    A `WeakKeyDictionary` that also acts like a :class:`collections.defaultdict`
+    """
+    default_factory: Callable[[], Any]
+
+    def __init__(self, default_factory: Callable[[], Any], *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.default_factory = default_factory
+
+    def __getitem__(self, key):
+        try:
+            value = super().__getitem__(key)
+        except KeyError:
+            value = self.default_factory()
+            self.__setitem__(key, value)
+        return value
+
+
+__NODE_ID: Mapping[SchemeNode, int] = WeakKeyDefaultDict(count().__next__)
+
+
 @singledispatch
 def process_signal_input(
         input: Input,
@@ -861,6 +884,7 @@ def process_signal_input_default(
     """
     """
     inputs = get_widget_input_signals(widget)
+    link = signal.link
     index = signal.index
     value = signal.value
 
@@ -891,8 +915,11 @@ def process_signal_input_default(
         assert inputs[index].link == signal.link
         inputs[index] = signal
 
+    wid = __NODE_ID[link.source_node]
+    # historical key format: widget_id, output name and the id passed to send
+    key = (wid, link.source_channel.name, signal.id)
     notify_input_helper(
-        input, widget, value, key=signal.link, index=index_local
+        input, widget, value, key=key, index=index_local
     )
 
 
