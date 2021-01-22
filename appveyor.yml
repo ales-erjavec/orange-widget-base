@@ -50,7 +50,7 @@ test_script:
   - build\.test\Scripts\activate
   - cd build\.test
   # Pre-populate the test environment
-  - python -m pip install pip~=19.3 wheel
+  - python -m pip install pip~=19.3 wheel git+https://github.com/biolab/orange-canvas-core.git
 
   - python -m pip install %TEST_DEP%
   - python -m pip install --no-index --no-deps -f ..\..\dist --pre %PROJECT_NAME%==%VERSION%

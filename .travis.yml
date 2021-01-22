@@ -46,7 +46,7 @@ install:
   - pip install $BUILD_DEP
   - pip --version
   - pip list --format=freeze
-  - pip install $TEST_DEP
+  - pip install $TEST_DEP git+https://github.com/biolab/orange-canvas-core.git
   - pip install -e .
 
 script:
