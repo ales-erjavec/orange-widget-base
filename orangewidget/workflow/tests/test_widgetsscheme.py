@@ -338,8 +338,7 @@ class TestSignalManager(GuiTest):
         self.assertSequenceEqual(
             sm.node_update_front(), [widgets.add_node]
         )
-
-        sm.process_queued()
+        assert QSignalSpy(sm.processingFinished).wait()
         self.assertEqual(widgets.add.a, 42)
         self.assertEqual(widgets.add.b, -42)
         link = model.find_links(widgets.add_node, sink_node=widgets.show_node)
