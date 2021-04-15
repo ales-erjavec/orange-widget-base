@@ -462,10 +462,7 @@ class OWWidgetManager(_WidgetManager):
 
         """
         if node not in self.__item_for_node:
-            if node in self.__scheme.nodes:
-                return ProcessingState.Initializing
-            else:
-                return 0
+            return 0
         return self.__item_for_node[node].state
 
     def widget_processing_state(self, widget):
