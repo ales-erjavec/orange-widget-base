@@ -29,12 +29,12 @@ from itertools import count
 from urllib.parse import urlencode
 from weakref import finalize
 
-from typing import Optional, Dict, Any, List, Mapping, overload
+from typing import Optional, Dict, Any, List, Mapping, overload, cast
 
 from AnyQt.QtWidgets import QWidget, QAction
 from AnyQt.QtGui import QWhatsThisClickedEvent
 
-from AnyQt.QtCore import Qt, QCoreApplication, QEvent, QByteArray
+from AnyQt.QtCore import Qt, QCoreApplication, QEvent, QByteArray, QObject
 from AnyQt.QtCore import pyqtSlot as Slot
 
 from orangecanvas.registry import WidgetDescription, OutputSignal
@@ -42,7 +42,7 @@ from orangecanvas.registry import WidgetDescription, OutputSignal
 from orangecanvas.scheme.signalmanager import (
     SignalManager, Signal, compress_signals
 )
-from orangecanvas.scheme import Scheme, SchemeNode
+from orangecanvas.scheme import Scheme, SchemeNode, NodeEvent
 from orangecanvas.scheme.node import UserMessage
 from orangecanvas.scheme.widgetmanager import WidgetManager as _WidgetManager
 from orangecanvas.utils import name_lookup
@@ -711,6 +711,10 @@ class WidgetsSignalManager(SignalManager):
     def __init__(self, scheme, **kwargs):
         super().__init__(scheme, **kwargs)
 
+    @property
+    def _widget_manager(self) -> WidgetManager:
+        return self.scheme().widget_manager
+
     def send(self, widget, channelname, value, *args, **kwargs):
         # type: (OWBaseWidget, str, Any, Any, Any, Any) -> None
         """
@@ -766,7 +770,7 @@ class WidgetsSignalManager(SignalManager):
     def is_invalidated(self, node: SchemeNode) -> bool:
         """Reimplemented from `SignalManager`"""
         rval = super().is_invalidated(node)
-        state = self.scheme().widget_manager.node_processing_state(node)
+        state = self._widget_manager.node_processing_state(node)
         return rval or state & (
                 ProcessingState.BlockingUpdate |
                 ProcessingState.Initializing
@@ -775,7 +779,7 @@ class WidgetsSignalManager(SignalManager):
     def is_ready(self, node: SchemeNode) -> bool:
         """Reimplemented from `SignalManager`"""
         rval = super().is_ready(node)
-        state = self.scheme().widget_manager.node_processing_state(node)
+        state = self._widget_manager.node_processing_state(node)
         return rval and not state & (
             ProcessingState.InputUpdate |
             ProcessingState.Initializing
@@ -818,6 +822,14 @@ class WidgetsSignalManager(SignalManager):
         """
         workflow = self.workflow()
         process_signals_for_widget(widget, signals, workflow)
+
+    def eventFilter(self, recv: QObject, event: QEvent) -> bool:
+        if event.type() == NodeEvent.NodeInitialize:
+            event = cast(NodeEvent, event)
+            w = self._widget_manager.widget_for_node(event.node())
+            if w is not None:
+                QCoreApplication.sendEvent(w, event)
+        return super().eventFilter(recv, event)
 
 
 __NODE_ID: Mapping[SchemeNode, int] = WeakKeyDefaultDict(count().__next__)
