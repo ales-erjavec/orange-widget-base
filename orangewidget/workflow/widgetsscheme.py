@@ -566,10 +566,10 @@ class OWWidgetManager(_WidgetManager):
         assert self.__updating_widget is None, "MUST NOT re-enter"
         # Force widget creation (if not already done)
         _ = self.widget_for_node(node)
-        item = self.__item_for_node[node]
+        item = self.__item_for_node.get(node)
         # Remember the widget instance. The node and the node->widget mapping
         # can be removed between this and __on_processing_finished.
-        if item.widget is not None:
+        if item is not None and item.widget is not None:
             self.__updating_widget = item.widget
             item.state |= ProcessingState.InputUpdate
             self.__update_node_processing_state(node)
