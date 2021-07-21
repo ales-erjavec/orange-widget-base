@@ -94,7 +94,7 @@ class WidgetsScheme(Scheme):
 
         """
         changed = False
-        for node in self.nodes:
+        for node in self.all_nodes():
             settings = self.widget_manager.widget_settings_for_node(node)
             if settings != node.properties:
                 node.properties = settings
@@ -305,7 +305,7 @@ class OWWidgetManager(_WidgetManager):
         """
         Reimplemented.
         """
-        assert node not in self.workflow().nodes
+        assert node not in self.workflow().all_nodes()
         item = self.__item_for_node.get(node)
         if item is not None and isinstance(item.widget, OWBaseWidget):
             assert item.node is node
@@ -462,7 +462,7 @@ class OWWidgetManager(_WidgetManager):
 
         """
         if node not in self.__item_for_node:
-            if node in self.__scheme.nodes:
+            if node in self.__scheme.all_nodes():
                 return ProcessingState.Initializing
             else:
                 return 0
