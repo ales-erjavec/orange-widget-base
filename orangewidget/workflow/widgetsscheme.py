@@ -897,7 +897,7 @@ def get_widget_input_signals(widget: OWBaseWidget) -> List[Signal]:
 
 
 def same_input_slot(s1: Signal, s2: Signal) -> bool:
-    return s1.link == s2.link
+    return s1.link == s2.link and s1.id == s2.id
 
 
 @singledispatch
