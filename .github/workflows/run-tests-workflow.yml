@@ -21,18 +21,18 @@ jobs:
             python-version: 3.6
             test-env: "PyQt5~=5.9.2"
 
-          - os: ubuntu-18.04
-            python-version: 3.7
-            test-env: "PyQt5~=5.12.1 PyQtWebEngine~=5.12.1"
-
-          - os: ubuntu-20.04
-            python-version: 3.8
-            test-env: "PyQt5~=5.14.0 PyQtWebEngine~=5.14.0"
-
-          - os: ubuntu-20.04
-            python-version: 3.9
-            test-env: "PyQt5~=5.15.0 PyQtWebEngine~=5.15.0"
-
+#          - os: ubuntu-18.04
+#            python-version: 3.7
+#            test-env: "PyQt5~=5.12.1 PyQtWebEngine~=5.12.1"
+#
+#          - os: ubuntu-20.04
+#            python-version: 3.8
+#            test-env: "PyQt5~=5.14.0 PyQtWebEngine~=5.14.0"
+#
+#          - os: ubuntu-20.04
+#            python-version: 3.9
+#            test-env: "PyQt5~=5.15.0 PyQtWebEngine~=5.15.0"
+#
 #          # macOS
 #          - os: macos-10.15
 #            python-version: 3.6
@@ -116,7 +116,8 @@ jobs:
           XVFBARGS: "-screen 0 1280x1024x24"
           LD_DEBUG: "libs"
           PYTHONVERBOSE: "1"
-        run: catchsegv xvfb-run -a -s "$XVFBARGS" coverage run -m unittest  -v
+#        run: catchsegv xvfb-run -a -s "$XVFBARGS" coverage run -m unittest  -v
+        run: catchsegv xvfb-run -a -s "$XVFBARGS" python -c "import PyQt5.Qt, matplotlib.pylab" # run -m unittest  -v
 
       - name: Upload Coverage
         run: codecov
