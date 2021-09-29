@@ -105,19 +105,19 @@ jobs:
         if: ${{ !startsWith(runner.os, 'Linux') }}
         run: coverage run -m unittest -v
 
-      - name: ls
-        run: ls -l /usr/lib/x86_64-linux-gnu/
-      - name: nm
-        run: nm -D /usr/lib/x86_64-linux-gnu/libgobject-2.0.so.0 | grep g_date_time_unref
+#      - name: ls
+#        run: ls -l /usr/lib/x86_64-linux-gnu/
+#      - name: nm
+#        run: nm -D /usr/lib/x86_64-linux-gnu/libgobject-2.0.so.0 | grep g_date_time_unref
 
       - name: Run Tests with Xvfb
         if: ${{ startsWith(runner.os, 'Linux') }}
         env:
           XVFBARGS: "-screen 0 1280x1024x24"
-          LD_DEBUG: "libs"
+          LD_DEBUG: "all"
           PYTHONVERBOSE: "1"
 #        run: catchsegv xvfb-run -a -s "$XVFBARGS" coverage run -m unittest  -v
-        run: catchsegv xvfb-run -a -s "$XVFBARGS" python -c "import PyQt5.Qt, matplotlib.pylab" # run -m unittest  -v
+        run: python -c "import PyQt5.Qt, matplotlib.pylab" # run -m unittest  -v
 
       - name: Upload Coverage
         run: codecov
