@@ -105,6 +105,11 @@ jobs:
         if: ${{ !startsWith(runner.os, 'Linux') }}
         run: coverage run -m unittest -v
 
+      - name: ls
+        run: ls -l /usr/lib/x86_64-linux-gnu/
+      - name: nm
+        run: nm -D /usr/lib/x86_64-linux-gnu/libgobject-2.0.so.0 | grep g_date_time_unref
+
       - name: Run Tests with Xvfb
         if: ${{ startsWith(runner.os, 'Linux') }}
         env:
