@@ -33,39 +33,39 @@ jobs:
             python-version: 3.9
             test-env: "PyQt5~=5.15.0 PyQtWebEngine~=5.15.0"
 
-          # macOS
-          - os: macos-10.15
-            python-version: 3.6
-            test-env: "PyQt5~=5.9.2"
-
-          - os: macos-10.15
-            python-version: 3.7
-            test-env: "PyQt5~=5.12.1 PyQtWebEngine~=5.12.1"
-
-          - os: macos-10.15
-            python-version: 3.8
-            test-env: "PyQt5~=5.14.0 PyQtWebEngine~=5.14.0"
-
-          - os: macos-10.15
-            python-version: 3.9
-            test-env: "PyQt5~=5.15.0 PyQtWebEngine~=5.15.0"
-
-          # Windows
-          - os: windows-2019
-            python-version: 3.6
-            test-env: "PyQt5~=5.9.2"
-
-          - os: windows-2019
-            python-version: 3.7
-            test-env: "PyQt5~=5.12.1 PyQtWebEngine~=5.12.1"
-
-          - os: windows-2019
-            python-version: 3.8
-            test-env: "PyQt5~=5.14.0 PyQtWebEngine~=5.14.0 pyqtgraph>=0.11a0"
-
-          - os: windows-2019
-            python-version: 3.9
-            test-env: "PyQt5~=5.15.0 PyQtWebEngine~=5.15.0 pyqtgraph>=0.11a0"
+#          # macOS
+#          - os: macos-10.15
+#            python-version: 3.6
+#            test-env: "PyQt5~=5.9.2"
+#
+#          - os: macos-10.15
+#            python-version: 3.7
+#            test-env: "PyQt5~=5.12.1 PyQtWebEngine~=5.12.1"
+#
+#          - os: macos-10.15
+#            python-version: 3.8
+#            test-env: "PyQt5~=5.14.0 PyQtWebEngine~=5.14.0"
+#
+#          - os: macos-10.15
+#            python-version: 3.9
+#            test-env: "PyQt5~=5.15.0 PyQtWebEngine~=5.15.0"
+#
+#          # Windows
+#          - os: windows-2019
+#            python-version: 3.6
+#            test-env: "PyQt5~=5.9.2"
+#
+#          - os: windows-2019
+#            python-version: 3.7
+#            test-env: "PyQt5~=5.12.1 PyQtWebEngine~=5.12.1"
+#
+#          - os: windows-2019
+#            python-version: 3.8
+#            test-env: "PyQt5~=5.14.0 PyQtWebEngine~=5.14.0 pyqtgraph>=0.11a0"
+#
+#          - os: windows-2019
+#            python-version: 3.9
+#            test-env: "PyQt5~=5.15.0 PyQtWebEngine~=5.15.0 pyqtgraph>=0.11a0"
     steps:
       - uses: actions/checkout@v2
       - name: Setup Python
@@ -78,7 +78,7 @@ jobs:
         # https://www.riverbankcomputing.com/pipermail/pyqt/2020-June/042949.html
         run: |
           sudo apt-get install -y libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0
-          sudo apt-get install -y libgl1-mesa-glx libegl1-mesa libxrandr2 libxrandr2 libxss1 libxcursor1 libxcomposite1 libasound2 libxi6 libxtst6
+          # sudo apt-get install -y libgl1-mesa-glx libegl1-mesa libxrandr2 libxrandr2 libxss1 libxcursor1 libxcomposite1 libasound2 libxi6 libxtst6
 
       - name: Setup Pip Cache
         uses: actions/cache@v2
@@ -109,6 +109,8 @@ jobs:
         if: ${{ startsWith(runner.os, 'Linux') }}
         env:
           XVFBARGS: "-screen 0 1280x1024x24"
+          LD_DEBUG: "libs"
+          PYTHONVERBOSE: "1"
         run: catchsegv xvfb-run -a -s "$XVFBARGS" coverage run -m unittest  -v
 
       - name: Upload Coverage
