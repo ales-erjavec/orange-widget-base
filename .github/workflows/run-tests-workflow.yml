@@ -117,12 +117,12 @@ jobs:
         if: ${{ startsWith(runner.os, 'Linux') }}
         env:
           XVFBARGS: "-screen 0 1280x1024x24"
-          LD_DEBUG: "libs"
-          PYTHONVERBOSE: "1"
-          PYTHONUNBUFFERED: "1"
-          LD_PRELOAD: "/lib/x86_64-linux-gnu/libgcc_s.so.1"
-#        run: catchsegv xvfb-run -a -s "$XVFBARGS" coverage run -m unittest  -v
-        run: python -c "import PyQt5.QtWidgets, PyQt5.Qt, matplotlib.pylab" # run -m unittest  -v
+#          LD_DEBUG: "libs"
+#          PYTHONVERBOSE: "1"
+#          PYTHONUNBUFFERED: "1"
+#          LD_PRELOAD: "/lib/x86_64-linux-gnu/libgcc_s.so.1"
+        run: catchsegv xvfb-run -a -s "$XVFBARGS" coverage run -m unittest  -v
+#        run: python -c "import PyQt5.QtWidgets, PyQt5.Qt, matplotlib.pylab" # run -m unittest  -v
 
       - name: Upload Coverage
         run: codecov
