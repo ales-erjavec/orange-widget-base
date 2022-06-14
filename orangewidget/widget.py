@@ -16,7 +16,8 @@ from AnyQt.QtWidgets import (
     QHBoxLayout)
 from AnyQt.QtCore import (
     Qt, QObject, QEvent, QRect, QMargins, QByteArray, QDataStream, QBuffer,
-    QSettings, QUrl, QThread, pyqtSignal as Signal, QSize, QLine)
+    QSettings, QUrl, QThread, pyqtSignal as Signal, QSize, QLineF
+)
 from AnyQt.QtGui import QIcon, QKeySequence, QDesktopServices, QPainter, QColor, QPen
 
 from orangewidget import settings, gui
@@ -456,10 +457,10 @@ class OWBaseWidget(QDialog, OWComponent, Report, ProgressBarMixin,
                 y = self.height() // 2
                 h = int((w - 6) / 1.12)
                 painter.setRenderHint(painter.Antialiasing)
-                painter.drawLines(
-                    QLine(x0, y - h, x1, y),
-                    QLine(x1, y, x0, y + h)
-                )
+                painter.drawLines([
+                    QLineF(x0, y - h, x1, y),
+                    QLineF(x1, y, x0, y + h)
+                ])
 
             def mouseReleaseEvent(self, event):
                 """Resize on left button"""
