@@ -47,7 +47,7 @@ class ModelItemCache(QObject):
     {0: ...
 
     """
-    __slots__ = ("__model", "__cache_data")
+    # __slots__ = ("__model", "__cache_data")
 
     def __init__(self, *args, maxsize=100 * 200, **kwargs):
         super().__init__(*args, **kwargs)
@@ -260,7 +260,7 @@ class CachedDataItemDelegate(QStyledItemDelegate):
         be speed up (e.g. if you know the model does not provide the relevant
         roles or you just want to ignore some of them).
     """
-    __slots__ = ("roles", "__cache",)
+    # __slots__ = ("roles", "__cache",)
 
     #: The default roles that are filled in initStyleOption
     DefaultRoles = (
@@ -380,9 +380,9 @@ class DataDelegate(CachedDataItemDelegate, StyledItemDelegate):
     ----
     Does not support text wrapping
     """
-    __slots__ = (
-        "__static_text_lru_cache", "__pen_lru_cache", "__style"
-    )
+    # __slots__ = (
+    #     "__static_text_lru_cache", "__pen_lru_cache", "__style"
+    # )
     #: Types that are right aligned by default (when Qt.TextAlignmentRole
     #: is not defined by the model or is excluded from self.roles)
     TypesAlignRight: Final[Tuple[type, ...]] = _TypesAlignRight
@@ -519,10 +519,10 @@ class BarItemDataDelegate(DataDelegate):
     barColorRole: int
         The item model role used to query the bar color.
     """
-    __slots__ = (
-        "color", "penWidth", "barFillRatioRole", "barColorRole",
-        "__line", "__pen"
-    )
+    # __slots__ = (
+    #     "color", "penWidth", "barFillRatioRole", "barColorRole",
+    #     "__line", "__pen"
+    # )
 
     def __init__(
             self, parent: Optional[QObject] = None, color=QColor(), penWidth=5,
