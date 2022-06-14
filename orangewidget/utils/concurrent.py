@@ -13,11 +13,14 @@ import concurrent.futures
 from concurrent.futures import Future, TimeoutError
 
 from AnyQt.QtCore import (
-    Qt, QObject, QMetaObject, QThreadPool, QThread, QRunnable, QSemaphore,
-    QCoreApplication, QEvent, Q_ARG,
+    Qt, QObject, QThreadPool, QThread, QRunnable, QSemaphore,
+    QCoreApplication, QEvent,
     pyqtSignal as Signal, pyqtSlot as Slot
 )
-from AnyQt import sip
+from AnyQt.QtCore import ispyowned
+
+from orangecanvas.utils.qinvoke import qinvoke
+
 
 _log = logging.getLogger(__name__)
 
@@ -40,7 +43,7 @@ class PyOwned:
         # Note: This is otherwise quite similar to how PyQt5 does this except
         # for the resurrection (i.e. the wrapper is allowed to be freed, but
         # C++ part is deleteLater-ed).
-        if sip.ispyowned(self):
+        if ispyowned(self):
             try:
                 own_thread = self.thread() is QThread.currentThread()
             except RuntimeError:
@@ -515,6 +518,6 @@ class methodinvoke(object):
         self.conntype = conntype
 
     def __call__(self, *args):
-        args = [Q_ARG(atype, arg) for atype, arg in zip(self.arg_types, args)]
-        return QMetaObject.invokeMethod(
-            self.obj, self.method, self.conntype, *args)
+        method = getattr(self.obj, self.method)
+        call = qinvoke(method, context=self.obj, type=self.conntype)
+        return call(*args)
