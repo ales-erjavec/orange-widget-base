@@ -348,6 +348,22 @@ class OWBaseWidget(QDialog, OWComponent, Report, ProgressBarMixin,
         sc = QShortcut(QKeySequence.Copy, self)
         sc.activated.connect(self.copy_to_clipboard)
 
+        # macOS Minimize action
+        self.__minimize_action = QAction(
+            "Minimize", self,
+            shortcut=QKeySequence("ctrl+m")
+        )
+        self.__minimize_action.triggered.connect(self.showMinimized)
+        # macOS Close window action
+        self.__close_action = QAction(
+            "Close", self, objectName="action-close-window",
+            shortcut=QKeySequence("ctrl+w")
+        )
+        self.__close_action.triggered.connect(self.hide)
+        if sys.platform == "darwin":
+            self.addAction(self.__minimize_action)
+            self.addAction(self.__close_action)
+
         if self.controlArea is not None:
             # Otherwise, the first control has focus
             self.controlArea.setFocus(Qt.ActiveWindowFocusReason)
@@ -1189,25 +1205,6 @@ class OWBaseWidget(QDialog, OWComponent, Report, ProgressBarMixin,
         Return the widget's status message.
         """
         return self.__statusMessage
-
-    def keyPressEvent(self, e):
-        """Handle default key actions or pass the event to the inherited method
-        """
-        if (e.modifiers(), e.key()) in OWBaseWidget.defaultKeyActions:
-            OWBaseWidget.defaultKeyActions[e.modifiers(), e.key()](self)
-        else:
-            QDialog.keyPressEvent(self, e)
-
-
-    defaultKeyActions = {}
-
-    if sys.platform == "darwin":
-        defaultKeyActions = {
-            (Qt.ControlModifier, Qt.Key_M):
-                lambda self: self.showMaximized
-                if self.isMinimized() else self.showMinimized(),
-            (Qt.ControlModifier, Qt.Key_W):
-                lambda self: self.setVisible(not self.isVisible())}
 
     def setBlocking(self, state=True) -> None:
         """
