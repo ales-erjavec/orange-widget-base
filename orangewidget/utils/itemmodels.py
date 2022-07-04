@@ -190,7 +190,12 @@ class AbstractSortTableModel(QAbstractTableModel):
         self.setSortIndices(indices)
 
     def setSortIndices(self, indices):
-        self.layoutAboutToBeChanged.emit([], QAbstractTableModel.VerticalSortHint)
+        layoutChangeParams = ([], QAbstractTableModel.VerticalSortHint)
+        try:
+            self.layoutAboutToBeChanged.emit(*layoutChangeParams)
+        except TypeError:
+            layoutChangeParams = ()
+            self.layoutAboutToBeChanged.emit()
 
         # Store persistent indices as well as their (actual) rows in the
         # source data table.
@@ -210,7 +215,7 @@ class AbstractSortTableModel(QAbstractTableModel):
             persistent,
             [self.index(row, pind.column())
              for row, pind in zip(persistent_rows, persistent)])
-        self.layoutChanged.emit([], QAbstractTableModel.VerticalSortHint)
+        self.layoutChanged.emit(*layoutChangeParams)
 
     def _sort(self, column, order):
         indices = None

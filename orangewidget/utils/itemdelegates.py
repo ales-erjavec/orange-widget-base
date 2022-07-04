@@ -12,7 +12,7 @@ import numpy as np
 
 from AnyQt.QtCore import (
     Qt, QObject, QAbstractItemModel, QModelIndex, QPersistentModelIndex, Slot,
-    QLocale, QRect, QPointF, QSize, QLineF,
+    QLocale, QRect, QPointF, QSize, QLineF, QT_VERSION_INFO,
 )
 from AnyQt.QtGui import (
     QFont, QFontMetrics, QPalette, QColor, QBrush, QIcon, QPixmap, QImage,
@@ -227,7 +227,7 @@ def init_style_option(
             features |= _QStyleOptionViewItem_HasCheckIndicator
             state = cast_(int, state)
             if state is not None:
-                option.checkState = state
+                option.checkState = Qt.CheckState(state)
     if Qt.DecorationRole in roles:
         value = data.get(Qt.DecorationRole)
         if value is not None:
@@ -468,13 +468,13 @@ class DataDelegate(CachedDataItemDelegate, StyledItemDelegate):
         """
         Return a `QStaticText` instance for depicting the text with the `font`
         """
+        fd = _font_def(font)
         try:
-            return self.__static_text_lru_cache[text, font, elideMode, width]
+            return self.__static_text_lru_cache[text, fd, elideMode, width]
         except KeyError:
             st = QStaticText(fontMetrics.elidedText(text, elideMode, width))
             st.prepare(QTransform(), font)
-            # take a copy of the font for cache key
-            key = text, QFont(font), elideMode, width
+            key = text, fd, elideMode, width
             self.__static_text_lru_cache[key] = st
             return st
 
@@ -488,6 +488,24 @@ class DataDelegate(CachedDataItemDelegate, StyledItemDelegate):
             pen = QPen(text_color_for_state(palette, state))
             self.__pen_lru_cache[key] = pen
             return pen
+
+
+if QT_VERSION_INFO >= (5, 13):
+    def _font_def(font: QFont):
+        return (font.pointSizeF(), font.pixelSize(),
+                font.weight(), font.style(), font.stretch(), font.styleHint(),
+                font.styleStrategy(),
+                # font.ignorePitch(),
+                font.fixedPitch(), tuple(font.families()), font.styleName(),
+                font.hintingPreference())
+else:
+    def _font_def(font: QFont):
+        return (font.pointSizeF(), font.pixelSize(),
+                font.weight(), font.style(), font.stretch(), font.styleHint(),
+                font.styleStrategy(),
+                # font.ignorePitch(),
+                font.fixedPitch(), font.family(), font.styleName(),
+                font.hintingPreference())
 
 
 def text_color_for_state(palette: QPalette, state: QStyle.State) -> QColor:
