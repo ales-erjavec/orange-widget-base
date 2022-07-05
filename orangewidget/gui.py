@@ -13,6 +13,7 @@ from collections import defaultdict
 
 import pkg_resources
 
+import AnyQt
 from AnyQt import QtWidgets, QtCore, QtGui
 from AnyQt.QtCore import Qt, QEvent, QObject, QTimer, pyqtSignal as Signal
 from AnyQt.QtGui import QCursor, QColor
@@ -185,6 +186,31 @@ class OWComponent:
             if hasattr(self, "controlled_attributes"):
                 for callback in self.controlled_attributes.get(name, ()):
                     callback(value)
+
+    if AnyQt.USED_API.lower().startswith("pyside"):
+        # pyside objects get their own non-co-operative __setattr__
+        def __init_subclass__(cls, **kwargs):
+            super().__init_subclass__(**kwargs)
+            try:
+                cls.__setattr_marker
+            except AttributeError:
+                pass
+            else:
+                return
+            cls.__setattr_marker = True
+            _setattr = cls.__setattr__
+
+            def __setattr__(self, name, value):
+                if "." in name:
+                    name, rest = name.split(".", 1)
+                    sub = getattr(self, name)
+                    setattr(sub, rest, value)
+                else:
+                    _setattr(self, name, value)
+                    if hasattr(self, "controlled_attributes"):
+                        for callback in self.controlled_attributes.get(name, ()):
+                            callback(value)
+            cls.__setattr__ = __setattr__
 
 
 def miscellanea(control, box, parent, *,

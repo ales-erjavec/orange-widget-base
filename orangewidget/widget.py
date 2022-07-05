@@ -382,7 +382,8 @@ class OWBaseWidget(QDialog, OWComponent, Report, ProgressBarMixin,
     def __init__(self, *args, **kwargs):
         """__init__s are called in __new__; don't call them from here"""
 
-    def __init_subclass__(cls, **_):
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
         for base in cls.__bases__:
             if hasattr(base, "_final_class"):
                 warnings.warn(
