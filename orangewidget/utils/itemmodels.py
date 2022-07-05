@@ -802,7 +802,7 @@ class PyListModel(QAbstractListModel):
             # type: (int) -> Dict[int, Any]
             if row < len(self._other_data):
                 return {key: val for key, val in self._other_data[row].items()
-                        if isinstance(key, int)}
+                        if isinstance(key, (int, Qt.ItemDataRole))}
             else:
                 return {}  # pragma: no cover
 
