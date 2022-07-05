@@ -373,8 +373,13 @@ class SimpleWidget(QObject):
         super().__init__()
         self.component = Component()
 
-    migrate_settings = Mock()
-    migrate_context = Mock()
+    @classmethod
+    def migrate_settings(cls, settings, version):
+        pass
+
+    @classmethod
+    def migrate_context(cls, contexts, version):
+        pass
 
 
 class SimpleWidgetMk1(SimpleWidget):
