@@ -35,7 +35,6 @@ from AnyQt.QtWidgets import QWidget, QAction
 from AnyQt.QtGui import QWhatsThisClickedEvent
 
 from AnyQt.QtCore import Qt, QCoreApplication, QEvent, QByteArray
-from AnyQt.QtCore import pyqtSlot as Slot
 
 from orangecanvas.registry import WidgetDescription, OutputSignal
 
@@ -47,8 +46,9 @@ from orangecanvas.scheme.node import UserMessage
 from orangecanvas.scheme.widgetmanager import WidgetManager as _WidgetManager
 from orangecanvas.utils import name_lookup
 from orangecanvas.resources import icon_loader
-from orangewidget.utils.signals import get_input_meta, notify_input_helper
+from orangecanvas.utils.qobjref import qobjref_weak
 
+from orangewidget.utils.signals import get_input_meta, notify_input_helper
 from orangewidget.widget import OWBaseWidget, Input
 from orangewidget.report.owreport import OWReport
 from orangewidget.settings import SettingsPrinter
@@ -364,10 +364,9 @@ class OWWidgetManager(_WidgetManager):
                       "Deferring deletion.", widget, item.state)
             self.__delay_delete[widget] = item
         else:
-            widget.processingStateChanged.disconnect(
-                self.__on_widget_state_changed)
-            widget.widgetStateChanged.disconnect(
-                self.__on_widget_state_changed)
+            widget.processingStateChanged.disconnect(item.changed)
+            widget.widgetStateChanged.disconnect(item.changed)
+            item.changed = None
             widget.deleteLater()
             item.widget = None
 
@@ -375,10 +374,8 @@ class OWWidgetManager(_WidgetManager):
         if not item.state & WidgetManager.DelayDeleteMask:
             widget = item.widget
             log.debug("Delayed delete for widget %s", widget)
-            widget.widgetStateChanged.disconnect(
-                self.__on_widget_state_changed)
-            widget.processingStateChanged.disconnect(
-                self.__on_widget_state_changed)
+            widget.widgetStateChanged.disconnect(item.changed)
+            widget.processingStateChanged.disconnect(item.changed)
             item.widget = None
             widget.deleteLater()
             del self.__delay_delete[widget]
@@ -430,12 +427,17 @@ class OWWidgetManager(_WidgetManager):
         widget.statusMessageChanged.connect(node.set_status_message)
 
         # OWBaseWidget's progress bar state (progressBarInit/Finished,Set)
+        wref = qobjref_weak(widget)  # avoid keeping ref in connection
+
+        def changed():
+            widget = wref()
+            if widget is not None:
+                self.__on_widget_state_changed(widget)
+        item.changed = changed
         widget.progressBarValueChanged.connect(node.set_progress)
-        widget.processingStateChanged.connect(
-            self.__on_widget_state_changed
-        )
+        widget.processingStateChanged.connect(item.changed)
         # Advertised state for the workflow execution semantics.
-        widget.widgetStateChanged.connect(self.__on_widget_state_changed)
+        widget.widgetStateChanged.connect(item.changed)
 
         # Install a help shortcut on the widget
         help_action = widget.findChild(QAction, "action-help")
@@ -591,12 +593,10 @@ class OWWidgetManager(_WidgetManager):
         if widget in self.__delay_delete:
             self.__try_delete(item)
 
-    @Slot()
-    def __on_widget_state_changed(self):
+    def __on_widget_state_changed(self, widget: OWBaseWidget):
         """
         OWBaseWidget state has changed.
         """
-        widget = self.sender()
         item = None
         if widget is not None:
             item = self.__item_for_widget(widget)
