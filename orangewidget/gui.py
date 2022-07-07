@@ -3263,7 +3263,8 @@ class CalendarWidgetWithTime(QCalendarWidget):
 
 class DateTimeEditWCalendarTime(QDateTimeEdit):
     def __init__(self, parent, format="yyyy-MM-dd hh:mm:ss"):
-        QDateTimeEdit.__init__(self, parent)
+        QDateTimeEdit.__init__(self)
+        self.setParent(parent)  # Parent not set in __init__ see PySide-XXXX
         self.setDisplayFormat(format)
         self.setCalendarPopup(True)
         self.calendarWidget = CalendarWidgetWithTime(self)
