@@ -39,6 +39,10 @@ jobs:
 
           - os: ubuntu-20.04
             python-version: "3.10"
+            test-env: "PySide2~=5.15.0"
+
+          - os: ubuntu-20.04
+            python-version: "3.10"
             test-env: "PyQt6~=6.2.3 PyQt6-Qt6~=6.2.3 PyQt6-WebEngine~=6.2.1 PyQt6-WebEngine-Qt6~=6.2.1"
             extra-system-packages: "libegl1-mesa"
 
@@ -60,6 +64,10 @@ jobs:
             test-env: "PyQt5~=5.15.0 PyQtWebEngine~=5.15.0"
 
           - os: macos-12
+            python-version: "3.10"
+            test-env: "PySide2~=5.15.0"
+
+          - os: macos-10.15
             python-version: "3.10"
             test-env: "PyQt6~=6.2.3 PyQt6-WebEngine~=6.2.1"
 
@@ -83,6 +91,10 @@ jobs:
           - os: windows-2019
             python-version: "3.10"
             test-env: "PyQt5~=5.15.0 PyQtWebEngine~=5.15.0 pyqtgraph>=0.11a0"
+
+          - os: windows-2019
+            python-version: "3.10"
+            test-env: "PySide2~=5.15.0"
 
           - os: windows-2019
             python-version: "3.10"
@@ -115,7 +127,7 @@ jobs:
       - name: Install Test Deps
         env:
           TEST_ENV: ${{ matrix.test-env }}
-          TEST_DEPS: wheel coverage codecov
+          TEST_DEPS: wheel coverage codecov git+https://github.com/ales-erjavec/orange-canvas-core.git@pyside2
         run: python -m pip install $TEST_DEPS $TEST_ENV
         shell: bash
 
