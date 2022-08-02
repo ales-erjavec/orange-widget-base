@@ -55,7 +55,7 @@ CLASSIFIERS = (
 INSTALL_REQUIRES = [
     "matplotlib",
     "pyqtgraph",
-    "AnyQt>=0.1.0",
+    "AnyQt>=0.2.0",
     "typing_extensions>=3.7.4.3",
     "orange-canvas-core>=0.1.20,<0.2a",
     'appnope; sys_platform=="darwin"'
