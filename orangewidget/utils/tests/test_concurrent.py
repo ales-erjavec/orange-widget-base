@@ -31,7 +31,7 @@ class CoreAppTestCase(unittest.TestCase):
         del self.app
 
 
-@unittest.skipIf(lambda: AnyQt.USED_API == "PySide2", "PySide2 in use")
+# @unittest.skipIf(lambda: AnyQt.USED_API == "PySide2", "PySide2 in use")
 class TestMethodinvoke(CoreAppTestCase):
     def test_methodinvoke(self):
         executor = ThreadPoolExecutor()
@@ -61,7 +61,7 @@ class TestMethodinvoke(CoreAppTestCase):
         executor.shutdown(wait=True)
 
 
-@unittest.skipIf(lambda: AnyQt.USED_API == "PySide2", "PySide2 in use")
+# @unittest.skipIf(lambda: AnyQt.USED_API == "PySide2", "PySide2 in use")
 class TestFutureWatcher(CoreAppTestCase):
     def test_watcher(self):
         executor = ThreadPoolExecutor(max_workers=1)
@@ -118,7 +118,7 @@ class TestFutureWatcher(CoreAppTestCase):
         self.assertEqual(list(spy.cancelled), [[f]])
 
 
-@unittest.skipIf(lambda: AnyQt.USED_API == "PySide2", "PySide2 in use")
+# @unittest.skipIf(lambda: AnyQt.USED_API == "PySide2", "PySide2 in use")
 class TestFutureSetWatcher(CoreAppTestCase):
     def test_watcher(self):
         def spies(w):
@@ -225,7 +225,7 @@ class TestFutureSetWatcher(CoreAppTestCase):
                 self.assertRaises(RuntimeError):
             watcher.flush()
 
-@unittest.skipIf(lambda: AnyQt.USED_API == "PySide2", "PySide2 in use")
+# @unittest.skipIf(lambda: AnyQt.USED_API == "PySide2", "PySide2 in use")
 class TestPyOwned(CoreAppTestCase):
     def test_py_owned(self):
         class Obj(QObject, PyOwned):

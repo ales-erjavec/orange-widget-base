@@ -3,7 +3,7 @@ General helper functions and classes for PyQt concurrent programming
 """
 # TODO: Rename the module to something that does not conflict with stdlib
 # concurrent
-from typing import Callable, Any, List, Optional
+from typing import Callable, Any, List, Optional, Tuple
 import threading
 import logging
 import warnings
@@ -20,7 +20,7 @@ from AnyQt.QtCore import (
 from AnyQt.QtCore import ispyowned
 
 from orangecanvas.utils.qinvoke import qinvoke
-
+from orangecanvas.utils.qobjref import qobjref_weak
 
 _log = logging.getLogger(__name__)
 
@@ -341,11 +341,16 @@ class FutureSetWatcher(QObject, PyOwned):
     #: Signal emitted when all the futures have completed.
     doneAll = Signal()
 
+    __Wakeup = QEvent.Type(QEvent.registerEventType())
+
     def __init__(self, futures: Optional[List['Future']] = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__futures = None
         self.__semaphore = None
         self.__countdone = 0
+        self.__futures_done: List[Tuple[int, "Future"]] = []
+        self.__lock = threading.Lock()
+        self.__emitpending_scheduled = False
         if futures is not None:
             self.setFutures(futures)
 
@@ -363,8 +368,22 @@ class FutureSetWatcher(QObject, PyOwned):
         if self.__futures is not None:
             raise RuntimeError("already set")
         self.__futures = []
-        selfweakref = weakref.ref(self)
-        schedule_emit = methodinvoke(self, "__emitpending", (int, Future))
+        selfweakref = qobjref_weak(self)
+
+        def schedule_emit(index, f):
+            self = selfweakref()  # not safe really
+            if self is None:  # pragma: no cover
+                return
+            with self.__lock:
+                self.__futures_done.append((index, f))
+                if not self.__emitpending_scheduled:
+                    try:
+                        QCoreApplication.postEvent(self, QEvent(self.__Wakeup))
+                        self.__emitpending_scheduled = True
+                    except RuntimeError:  # pragma: no cover
+                        # Ignore RuntimeErrors (when C++ side of QObject is deleted)
+                        # (? Use QObject.destroyed and remove the done callback ?)
+                        pass
 
         # Semaphore counting the number of future that have enqueued
         # done notifications. Used for the `wait` implementation.
@@ -375,14 +394,9 @@ class FutureSetWatcher(QObject, PyOwned):
 
             def on_done(index, f):
                 try:
-                    selfref = selfweakref()  # not safe really
-                    if selfref is None:  # pragma: no cover
-                        return
                     try:
                         schedule_emit(index, f)
-                    except RuntimeError:  # pragma: no cover
-                        # Ignore RuntimeErrors (when C++ side of QObject is deleted)
-                        # (? Use QObject.destroyed and remove the done callback ?)
+                    except RuntimeError:
                         pass
                 finally:
                     semaphore.release()
@@ -390,8 +404,7 @@ class FutureSetWatcher(QObject, PyOwned):
             future.add_done_callback(partial(on_done, i))
 
         if not self.__futures:
-            # `futures` was an empty sequence.
-            methodinvoke(self, "doneAll", ())()
+            QCoreApplication.postEvent(self, QEvent(self.__Wakeup))
 
     @Slot(int, Future)
     def __emitpending(self, index, future):
@@ -418,8 +431,19 @@ class FutureSetWatcher(QObject, PyOwned):
 
         self.progressChanged.emit(self.__countdone, len(self.__futures))
 
-        if self.__countdone == len(self.__futures):
-            self.doneAll.emit()
+    def customEvent(self, event: 'QEvent') -> None:
+        if event.type() == self.__Wakeup:
+            with self.__lock:
+                done = self.__futures_done[:]
+                self.__futures_done.clear()
+                self.__emitpending_scheduled = False
+            for idx, f in done:
+                self.__emitpending(idx, f)
+
+            if self.__countdone == len(self.__futures):
+                self.doneAll.emit()
+            return
+        super().customEvent(event)
 
     def flush(self):
         """
@@ -430,13 +454,11 @@ class FutureSetWatcher(QObject, PyOwned):
         """
         if QThread.currentThread() is not self.thread():
             raise RuntimeError("`flush()` called from a wrong thread.")
-        # NOTE: QEvent.MetaCall is the event implementing the
-        # `Qt.QueuedConnection` method invocation.
-        QCoreApplication.sendPostedEvents(self, QEvent.MetaCall)
+        QCoreApplication.sendPostedEvents(self, self.__Wakeup)
 
     def wait(self):
         """
-        Wait for for all the futures to complete and *enqueue* notifications
+        Wait for all the futures to complete and *enqueue* notifications
         to this object, but do not emit any signals.
 
         Use `flush()` to emit all signals after a `wait()`
@@ -516,8 +538,11 @@ class methodinvoke(object):
         self.method = method
         self.arg_types = tuple(arg_types)
         self.conntype = conntype
+        method = getattr(self.obj, self.method)
+        self.__call = qinvoke(method, context=self.obj, type=self.conntype)
 
     def __call__(self, *args):
+        # return self.__call(*args)
         method = getattr(self.obj, self.method)
         call = qinvoke(method, context=self.obj, type=self.conntype)
         return call(*args)
