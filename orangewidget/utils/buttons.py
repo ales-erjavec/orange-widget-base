@@ -69,10 +69,9 @@ class SimpleButton(QAbstractButton):
     """
     A simple icon button widget.
     """
-    def event(self, event):
-        if event.type() == QEvent.Enter or event.type() == QEvent.Leave:
-            self.update()
-        return super().event(event)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setAttribute(Qt.WA_Hover)
 
     def sizeHint(self):
         # reimplemented
