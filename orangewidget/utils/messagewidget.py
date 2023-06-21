@@ -364,6 +364,7 @@ class MessageWidget(QWidget):
             QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         )
         super().__init__(parent, **kwargs)
+        self.setAttribute(Qt.WA_Hover)
         self._openExternalLinks = openExternalLinks  # type: bool
         #: The full (joined all messages text - rendered as html), displayed
         #: in a tooltip.
@@ -491,14 +492,6 @@ class MessageWidget(QWidget):
 
     def enterEvent(self, event):
         super().enterEvent(event)
-        self.update()
-
-    def leaveEvent(self, event):
-        super().leaveEvent(event)
-        self.update()
-
-    def changeEvent(self, event):
-        super().changeEvent(event)
         self.update()
 
     def paintEvent(self, event):
