@@ -14,7 +14,7 @@ def numpy_repr(a):
     # avoid numpy repr as it changes between versions
     # TODO handle numpy repr differences
     if isinstance(a, np.ndarray):
-        return "array(" + repr(list(a)) + ")"
+        return "array(" + repr(a.tolist()) + ")"
     try:
         np.set_printoptions(threshold=10**10)
         return repr(a)
@@ -25,12 +25,20 @@ def numpy_repr(a):
 def numpy_repr_int(a):
     # avoid numpy repr as it changes between versions
     # TODO handle numpy repr differences
-    return "array(" + repr(list(a)) + ", dtype='int')"
+    if isinstance(a, np.ndarray):
+        a = a.tolist()
+    else:
+        a = list(a)
+    return "array(" + repr(a) + ", dtype='int')"
 
 
 def compress_if_all_same(l):
     s = set(l)
-    return s.pop() if len(s) == 1 else l
+    if len(s) == 1:
+        v = s.pop()
+        return v.item() if isinstance(v, np.generic) else v
+    else:
+        return l
 
 
 def is_sequence_not_string(a):
@@ -188,6 +196,7 @@ def scene_code(scene):
     code = []
 
     code.append("import matplotlib.pyplot as plt")
+    code.append("import numpy as np")
     code.append("from numpy import array")
 
     code.append("")
