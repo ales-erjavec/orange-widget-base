@@ -1,3 +1,4 @@
+import io
 import unittest
 import unittest.mock
 import logging
@@ -111,25 +112,27 @@ class Show(widget.OWBaseWidget):
         X = widget.Input("X", object)
 
     x = None
+    stream = io.StringIO()
 
     @Inputs.X
     def set_x(self, x):
         self.x = x
 
     def handleNewSignals(self):
-        print(self.x)
+        print(self.x, file=self.stream)
 
 
 class OldStyleShow(widget.OWBaseWidget):
     name = "Show"
     inputs = [("X", object, "set_x")]
     x = None
+    stream = io.StringIO()
 
     def set_x(self, x):
         self.x = x
 
     def handleNewSignals(self):
-        print(self.x)
+        print(self.x, file=self.stream)
 
 
 def widget_description(class_):
