@@ -477,8 +477,12 @@ class WidgetSignalsMixin:
         def signal_from_args(args, signal_type):
             if isinstance(args, tuple):
                 return signal_type(*args)
+            elif isinstance(args, dict):
+                return signal_type(**args)
             elif isinstance(args, signal_type):
                 return copy.copy(args)
+            else:
+                raise TypeError
 
         if hasattr(cls, "inputs") and cls.inputs:
             cls.inputs = [signal_from_args(input_, InputSignal)
