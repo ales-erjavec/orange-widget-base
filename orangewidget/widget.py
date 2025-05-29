@@ -1772,6 +1772,21 @@ class OWBaseWidget(QDialog, OWComponent, Report, ProgressBarMixin,
         super().actionEvent(event)
 
 
+class OWAction(QAction):
+    """
+    An action to be inserted into canvas right click context menu.
+
+    Actions defined and added this way are pulled from the widget and
+    inserted into canvas GUI's right context menu. The actions must
+    be defined in the OWWidget's `__init__` method and added to the
+    widget with `QWidget.addAction`.
+
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setProperty("ext-workflow-node-menu-action", True)
+
+
 class _StatusBar(QStatusBar):
     #: Emitted on a change of geometry or visibility (explicit hide/show)
     change = Signal()
