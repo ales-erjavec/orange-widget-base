@@ -1,7 +1,6 @@
+import pathlib
 from collections import Counter
 from itertools import count
-
-import re
 
 import os
 import sys
@@ -70,14 +69,15 @@ fix_extension.CANCEL = 2          # type: ignore
 
 
 def unambiguous_paths(fullpaths, minlevel=1):
-    assert minlevel > 0
+    def split_path_components(path: str) -> list[str]:
+        r"""
+        >>> split_path_components(r"C:\a\b\c")
+        ["C:\\", "a", "b', "c"]
+        """
+        return list(pathlib.Path(path).parts)
 
-    # split paths using str.split(..., os.path.sep);
-    # os.path.split only splits into head and tail
-    sep = re.escape(os.path.sep)
-    if os.path.altsep is not None:
-        sep = f"{sep}|{re.escape(os.path.altsep)}"
-    splitpaths = [re.split(sep, path) for path in fullpaths]
+    assert minlevel > 0
+    splitpaths = [split_path_components(path) for path in fullpaths]
 
     to_check = list(range(len(fullpaths)))
     paths = [os.path.join(*path[-minlevel:]) for path in splitpaths]

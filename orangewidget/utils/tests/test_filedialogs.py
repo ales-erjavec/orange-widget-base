@@ -1,4 +1,5 @@
-import sys
+import ntpath
+import pathlib
 
 import os
 import unittest
@@ -65,19 +66,8 @@ class TestUtils(unittest.TestCase):
             t = ["abc/def/ghi.txt", "abc/def/ghi.txt"]
             self.assertEqual(unambiguous_paths(t), t)
 
-    if sys.platform == "win32":
-        ptch1 = ptch2 = ptch3 = lambda x: x
-    else:
-        # This test is intended for Windows, but for easier testing of a test
-        # on non-Windows machine, we patch it to make it work on others
-        ptch1 = unittest.mock.patch("os.path.sep", "/")
-        ptch2 = unittest.mock.patch("os.path.altsep", "\\")
-        ptch3 = unittest.mock.patch(
-            "os.path.join",
-            lambda *args, oj=os.path.join: oj(*args).replace("/", "\\"))
-    @ptch1
-    @ptch2
-    @ptch3
+    @unittest.mock.patch("pathlib.Path", pathlib.PureWindowsPath)
+    @unittest.mock.patch("os.path.join", ntpath.join)
     def test_unambiguous_paths_windows(self):
         paths = ["C:\\Documents/Newsletters\\Summer2018.pdf",
                  "D:\\Documents/Newsletters\\Summer2018.pdf"]
