@@ -142,6 +142,7 @@ jobs:
         run: |
           coverage run -m unittest -v
           coverage xml
+        shell: bash
 
       - name: Run Tests with Xvfb
         if: ${{ startsWith(runner.os, 'Linux') }}
