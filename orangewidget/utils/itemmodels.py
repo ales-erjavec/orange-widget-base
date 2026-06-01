@@ -601,7 +601,7 @@ class PyListModel(QAbstractListModel):
         row = index.row()
         if role in [self.list_item_role, Qt.EditRole]:
             item = self[row]
-            if isinstance(item, SeparatorItem):
+            if isinstance(item, SeparatorItem) and role != Qt.EditRole:
                 return None
             return item
         elif (role == Qt.AccessibleDescriptionRole and

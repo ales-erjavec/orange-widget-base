@@ -662,6 +662,7 @@ class TestPyListModel(unittest.TestCase):
             if i % 2:
                 midx = model.index(i)
                 self.assertIs(midx.data(Qt.DisplayRole), None)
+                self.assertIs(midx.data(Qt.EditRole), model.Separator)
                 self.assertEqual(midx.data(Qt.AccessibleDescriptionRole), "separator")
                 self.assertEqual(midx.flags(), Qt.NoItemFlags)
 
