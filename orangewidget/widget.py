@@ -297,6 +297,16 @@ class OWBaseWidget(QDialog, OWComponent, Report, ProgressBarMixin,
     messageActivated = Signal(Msg)
     messageDeactivated = Signal(Msg)
 
+    #: A list of qualified class/object names that can be saved/restored
+    #: using pickle protocol. If not listed here settings for widget will
+    #: not be saved/restored.
+    #: The qualified names must be formatted as ``{module_name}:{qualname}``
+    #: e.g ``"my.package:ClassName"``
+    #: Note that reconstructor functions etc. must be included if necessary.
+    #:
+    #: .. versionadded:: 4.30.0
+    SETTINGS_PICKLE_TYPES: list[str]
+
     savedWidgetGeometry = settings.Setting(None)
     controlAreaVisible = settings.Setting(True, schema_only=True)
 
@@ -609,6 +619,7 @@ class OWBaseWidget(QDialog, OWComponent, Report, ProgressBarMixin,
         properties["inputs"] = cls.get_signals("inputs")
         properties["outputs"] = cls.get_signals("outputs")
         properties["qualified_name"] = f"{cls.__module__}.{cls.__name__}"
+        properties["allowed_property_types"] = getattr(cls, "SETTINGS_PICKLE_TYPES", ())
         return properties
 
     @classmethod

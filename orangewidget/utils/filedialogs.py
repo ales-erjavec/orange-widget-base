@@ -528,6 +528,13 @@ class _RecentPathsWComboMixinBase:
     inherited `add_path` and `select_file` to call `set_file_list`.
     """
 
+    SETTINGS_PICKLE_TYPES = [
+        "orangewidget.utils.filedialogs:RecentPath",
+        # aliases
+        "Orange.widgets.utils.filedialogs:RecentPath",
+        "Orange.widgets.data.owfile:RecentPath",
+    ]
+
     def __init__(self):
         super().__init__()
         self.file_combo = \

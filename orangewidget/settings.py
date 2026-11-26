@@ -40,6 +40,7 @@ import warnings
 from operator import itemgetter
 from typing import Any, Optional, Tuple
 
+from orangecanvas.scheme import readwrite
 from orangewidget.gui import OWComponent
 
 log = logging.getLogger(__name__)
@@ -703,6 +704,7 @@ class ContextSetting(Setting):
         self.required = required
 
 
+@readwrite.RestrictedUnpickler.register_pickle_safe
 class Context:
     """Class for data that defines context and
     values that should be applied to widget if given context
